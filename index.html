@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GeoCanvas v4 | Fixed & Enhanced</title>
+
+    <!-- External Libraries -->
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Draw CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <!-- Leaflet Geosearch CSS (Updated Version) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css" />
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --surface: #ffffff;
+            --bg: #f8fafc;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --sidebar-width: 360px;
+        }
+
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; overflow: hidden; background: var(--bg); }
+
+        .app-container { display: flex; height: 100vh; width: 100vw; }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            z-index: 1001; /* Higher than map */
+            box-shadow: 4px 0 24px rgba(0,0,0,0.05);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .app-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .brand-icon {
+            width: 32px; height: 32px; background: var(--primary); color: white;
+            border-radius: 8px; display: flex; align-items: center; justify-content: center;
+        }
+        .brand-text h1 { font-size: 18px; font-weight: 700; margin: 0; color: var(--text-main); }
+        .brand-text p { font-size: 11px; margin: 0; color: var(--text-muted); }
+
+        /* --- Search Bar --- */
+        .search-container { display: flex; gap: 8px; }
+        .search-input {
+            flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 13px; outline: none; transition: border 0.2s;
+        }
+        .search-input:focus { border-color: var(--primary); }
+        .btn-search {
+            background: var(--primary); color: white; border: none; border-radius: 6px;
+            padding: 0 15px; cursor: pointer; transition: background 0.2s;
+        }
+        .btn-search:hover { background: var(--primary-hover); }
+
+        /* --- Content Area --- */
+        .sidebar-content {
+            flex: 1; overflow-y: auto; padding: 20px;
+            display: flex; flex-direction: column; gap: 24px;
+        }
+
+        .tool-section h4 {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--text-muted); margin: 0 0 10px 0; font-weight: 700;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .tool-section h4::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+        /* --- Layer Switcher Grid --- */
+        .layer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .layer-btn {
+            border: 1px solid var(--border); border-radius: 6px; padding: 8px;
+            text-align: center; cursor: pointer; transition: all 0.2s; background: white;
+        }
+        .layer-btn img {
+            width: 100%; height: 40px; object-fit: cover; border-radius: 4px;
+            margin-bottom: 5px; filter: grayscale(100%);
+        }
+        .layer-btn span { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); }
+
+        .layer-btn.active { border-color: var(--primary); background: #eff6ff; }
+        .layer-btn.active img { filter: none; }
+        .layer-btn.active span { color: var(--primary); }
+
+        /* --- Controls --- */
+        .control-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+
+        .btn {
+            background: white; border: 1px solid var(--border); color: var(--text-main);
+            padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
+            display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #f1f5f9; }
+        .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn.primary:hover { background: var(--primary-hover); }
+
+        .btn.active {
+            background: #eff6ff; border-color: var(--primary); color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+        }
+
+        input[type="number"] { width: 80px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
+        input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: none; }
+
+        /* --- Map --- */
+        .map-wrapper { flex: 1; position: relative; }
+        #map { height: 100%; width: 100%; z-index: 1; }
+
+        /* --- Toasts & Loader --- */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 2000; }
+        .toast {
+            background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px;
+            margin-top: 10px; font-size: 13px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            animation: slideUp 0.3s ease; display: flex; align-items: center; gap: 10px;
+        }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        .loader {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 3000;
+            display: none; align-items: center; justify-content: center; flex-direction: column;
+        }
+        .spinner {
+            width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--primary);
+            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Custom Labels */
+        .custom-label {
+            background: rgba(255, 255, 255, 0.95); padding: 4px 8px; border-radius: 4px;
+            border: 1px solid #333; font-weight: 600; font-size: 12px; white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .app-container { flex-direction: column-reverse; }
+            .sidebar { width: 100%; height: 50%; border-right: none; border-top: 1px solid var(--border); }
+            .map-wrapper { height: 50%; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="app-brand">
+                    <div class="brand-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+                    <div class="brand-text">
+                        <h1>GeoCanvas v4</h1>
+                        <p>Studio Edition</p>
+                    </div>
+                </div>
+
+                <!-- Fixed Search Bar -->
+                <div class="search-container">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search City, Address...">
+                    <button class="btn-search" onclick="performSearch()"><i class="fa-solid fa-magnifying-glass"></i></button>
+                </div>
+            </div>
+
+            <div class="sidebar-content">
+
+                <!-- 1. Map Layers (Added) -->
+                <div class="tool-section">
+                    <h4>Map Layers</h4>
+                    <div class="layer-grid">
+                        <div class="layer-btn active" onclick="changeLayer('street', this)">
+                            <img src="https://a.tile.openstreetmap.org/12/2073/1409.png" alt="Street">
+                            <span>Street</span>
+                        </div>
+                        <div class="layer-btn" onclick="changeLayer('satellite', this)">
+                            <img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1409/2073" alt="Sat">
+                            <span>Satellite</span>
+                        </div>
+                        <div class="layer-btn" onclick="changeLayer('dark', this)">
+                            <img src="https://a.basemaps.cartocdn.com/dark_all/12/2073/1409.png" alt="Dark">
+                            <span>Dark</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Styling -->
+                <div class="tool-section">
+                    <h4>Style</h4>
+                    <div class="control-row">
+                        <input type="color" id="colorPicker" value="#2563eb">
+                        <div style="font-size:12px; color:var(--text-muted);">
+                            <strong>Active Color</strong><br>Applies to new items
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Fixed Circle Tool -->
+                <div class="tool-section" style="background: #f0f9ff; padding: 10px; border-radius: 8px; border: 1px solid #bae6fd;">
+                    <h4 style="color: #0369a1; border:none;"><i class="fa-regular fa-circle-dot"></i> Precision Circle</h4>
+                    <div class="control-row">
+                        <input type="number" id="radiusInput" value="5" min="0.1" step="0.1">
+                        <span style="font-size: 13px; font-weight: 600;">km</span>
+                        <button class="btn primary" id="btnFixedCircle" onclick="activateTool('fixedCircle')">
+                            Place
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 4. Text & Freehand -->
+                <div class="tool-section">
+                    <h4>Tools</h4>
+                    <div class="control-row">
+                        <button class="btn" id="btnDrawLine" onclick="activateTool('polyline')">
+                            <i class="fa-solid fa-route"></i> Line
+                        </button>
+                        <button class="btn" id="btnDrawPoly" onclick="activateTool('polygon')">
+                            <i class="fa-solid fa-draw-polygon"></i> Area
+                        </button>
+                    </div>
+                    <button class="btn" id="btnTextTool" onclick="activateTool('text')" style="width:100%">
+                        <i class="fa-solid fa-font"></i> Add Text Label
+                    </button>
+                </div>
+
+                <!-- 5. Data -->
+                <div class="tool-section" style="margin-top:auto">
+                    <h4>Export</h4>
+                    <div class="control-row">
+                        <button class="btn" onclick="downloadJSON()"><i class="fa-solid fa-file-code"></i> Save</button>
+                        <button class="btn" onclick="document.getElementById('fileInput').click()"><i class="fa-solid fa-folder-open"></i> Load</button>
+                        <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(this)">
+                    </div>
+                    <button class="btn primary" onclick="exportImage()" style="width:100%">
+                        <i class="fa-solid fa-image"></i> Download Image
+                    </button>
+                    <button class="btn" onclick="clearMap()" style="width:100%; margin-top:10px; color: var(--danger); border-color: #fee2e2;">
+                        <i class="fa-solid fa-trash"></i> Clear Canvas
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="map-wrapper">
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+    <div class="loader" id="loader"><div class="spinner"></div><p>Processing...</p></div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <!-- Updated Geosearch Version -->
+    <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <script>
+        // --- Globals ---
+        let map;
+        let drawnItems;
+        let activeTool = null;
+        let nativeDrawHandler = null;
+        const layers = {};
+
+        // --- 1. Init Map & Layers ---
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([40.7128, -74.0060], 13);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            L.control.scale({ metric: true, imperial: true, position: 'bottomright' }).addTo(map);
+
+            // Define Layers
+            layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap', crossOrigin: true
+            });
+
+            layers.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri', crossOrigin: true
+            });
+
+            layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB', crossOrigin: true
+            });
+
+            // Default
+            layers.street.addTo(map);
+
+            // Feature Group
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+        }
+
+        initMap();
+
+        // --- 2. Tool Logic (Fixed) ---
+
+        function activateTool(toolName) {
+            // 1. Reset everything first
+            resetTools();
+
+            activeTool = toolName;
+            const color = document.getElementById('colorPicker').value;
+
+            // 2. Handle Leaflet Draw (Freehand)
+            if (toolName === 'polyline' || toolName === 'polygon') {
+                if (toolName === 'polyline') {
+                    nativeDrawHandler = new L.Draw.Polyline(map, { shapeOptions: { color: color, weight: 4 } });
+                } else {
+                    nativeDrawHandler = new L.Draw.Polygon(map, { shapeOptions: { color: color } });
+                }
+                nativeDrawHandler.enable();
+                updateUI(toolName === 'polyline' ? 'btnDrawLine' : 'btnDrawPoly');
+                showToast(`Draw ${toolName} active`);
+            }
+            // 3. Handle Custom Click Tools
+            else if (toolName === 'fixedCircle') {
+                updateUI('btnFixedCircle');
+                map.getContainer().style.cursor = 'copy';
+                showToast('Click map to place circle');
+            }
+            else if (toolName === 'text') {
+                updateUI('btnTextTool');
+                map.getContainer().style.cursor = 'text';
+                showToast('Click map to add text');
+            }
+        }
+
+        function resetTools() {
+            activeTool = null;
+            if (nativeDrawHandler) {
+                nativeDrawHandler.disable();
+                nativeDrawHandler = null;
+            }
+            // Reset UI buttons
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            // Reset cursor
+            map.getContainer().style.cursor = '';
+        }
+
+        function updateUI(activeId) {
+            if(activeId) document.getElementById(activeId).classList.add('active');
+        }
+
+        // --- 3. Map Click Handler (Core Logic) ---
+        map.on('click', function(e) {
+            const color = document.getElementById('colorPicker').value;
+
+            if (activeTool === 'fixedCircle') {
+                // Get KM, convert to Meters
+                const km = parseFloat(document.getElementById('radiusInput').value) || 5;
+                const radiusMeters = km * 1000;
+
+                const circle = L.circle(e.latlng, {
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.2,
+                    radius: radiusMeters
+                });
+
+                // Add popup and metadata
+                circle.bindPopup(`<b>Radius:</b> ${km} km`).openPopup();
+                circle.feature = {
+                    type: 'Feature',
+                    properties: { type: 'circle', radius: radiusMeters, radiusKm: km, color: color }
+                };
+
+                drawnItems.addLayer(circle);
+            }
+            else if (activeTool === 'text') {
+                // Use a short delay to prevent UI locking
+                setTimeout(() => {
+                    const text = prompt("Enter Label Text:");
+                    if (text) {
+                        const icon = L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div class="custom-label" style="color:${color}; border-color:${color}">${text}</div>`,
+                            iconSize: [null, null], iconAnchor: [20, 10]
+                        });
+                        const marker = L.marker(e.latlng, { icon: icon });
+                        marker.feature = {
+                            type: 'Feature',
+                            properties: { type: 'text', content: text, color: color }
+                        };
+                        drawnItems.addLayer(marker);
+                        resetTools(); // Exit text mode after placing
+                    }
+                }, 50);
+            }
+        });
+
+        // Handle Leaflet Draw Created Event
+        map.on(L.Draw.Event.CREATED, function (e) {
+            const layer = e.layer;
+            const color = document.getElementById('colorPicker').value;
+
+            if (layer.setStyle) {
+                layer.setStyle({ color: color, fillColor: color });
+            }
+
+            layer.feature = layer.feature || { type: 'Feature', properties: {} };
+            layer.feature.properties.color = color;
+
+            drawnItems.addLayer(layer);
+            // Don't reset tool here to allow continuous drawing if desired,
+            // or uncomment next line to stop after one shape:
+            // resetTools();
+        });
+
+        // --- 4. Search Functionality (Fixed) ---
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (!query) return;
+
+            showLoader(true);
+
+            // Check if GeoSearch is loaded
+            if (!window.GeoSearch || !window.GeoSearch.OpenStreetMapProvider) {
+                showToast('Search library not loaded', true);
+                showLoader(false);
+                return;
+            }
+
+            try {
+                const provider = new window.GeoSearch.OpenStreetMapProvider();
+                const results = await provider.search({ query: query });
+
+                if (results && results.length > 0) {
+                    const best = results[0];
+                    // GeoSearch 3.x uses { x: lng, y: lat }
+                    map.setView([best.y, best.x], 13);
+
+                    const popup = L.popup()
+                        .setLatLng([best.y, best.x])
+                        .setContent(`<b>${best.label}</b>`)
+                        .openOn(map);
+
+                    showToast('Location found');
+                } else {
+                    showToast('No results found', true);
+                }
+            } catch (err) {
+                console.error(err);
+                showToast('Search failed', true);
+            }
+            showLoader(false);
+        }
+
+        // Enter key for search
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        // --- 5. Layer Switching ---
+        function changeLayer(type, btn) {
+            // Remove all
+            Object.values(layers).forEach(l => map.removeLayer(l));
+            // Add new
+            layers[type].addTo(map);
+            // UI
+            document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        // --- 6. Import/Export ---
+        function downloadJSON() {
+            const geojson = { type: "FeatureCollection", features: [] };
+
+            drawnItems.eachLayer(layer => {
+                let f;
+                if (layer instanceof L.Circle && layer.feature) {
+                    // Manual circle handling
+                    f = {
+                        type: "Feature",
+                        properties: layer.feature.properties,
+                        geometry: { type: "Point", coordinates: [layer.getLatLng().lng, layer.getLatLng().lat] }
+                    };
+                } else if (layer.toGeoJSON) {
+                    f = layer.toGeoJSON();
+                    if(layer.options.color) f.properties.color = layer.options.color;
+                    if(layer.feature) f.properties = { ...f.properties, ...layer.feature.properties };
+                }
+                if(f) geojson.features.push(f);
+            });
+
+            saveFile(JSON.stringify(geojson, null, 2), `map-${Date.now()}.json`, 'application/json');
+        }
+
+        function loadJSON(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    drawnItems.clearLayers();
+                    L.geoJSON(data, {
+                        pointToLayer: (feature, latlng) => {
+                            if(feature.properties.type === 'circle') {
+                                const c = L.circle(latlng, {
+                                    radius: feature.properties.radius,
+                                    color: feature.properties.color,
+                                    fillColor: feature.properties.color
+                                });
+                                c.feature = feature;
+                                return c;
+                            }
+                            if(feature.properties.type === 'text') {
+                                const icon = L.divIcon({
+                                    className: 'custom-div-icon',
+                                    html: `<div class="custom-label" style="color:${feature.properties.color}; border-color:${feature.properties.color}">${feature.properties.content}</div>`
+                                });
+                                const m = L.marker(latlng, { icon: icon });
+                                m.feature = feature;
+                                return m;
+                            }
+                            return L.marker(latlng);
+                        },
+                        style: (f) => ({ color: f.properties.color, fillColor: f.properties.color })
+                    }).eachLayer(l => drawnItems.addLayer(l));
+                    if(drawnItems.getLayers().length) map.fitBounds(drawnItems.getBounds());
+                    showToast('Project Loaded');
+                } catch(err) { showToast('Invalid File', true); }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        function exportImage() {
+            showLoader(true);
+            const controls = document.querySelectorAll('.leaflet-control-container');
+            controls.forEach(c => c.style.display = 'none');
+            setTimeout(() => {
+                html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: true }).then(canvas => {
+                    saveFile(canvas.toDataURL(), 'map-image.png', 'image/png', true);
+                    controls.forEach(c => c.style.display = 'block');
+                    showLoader(false);
+                });
+            }, 1000);
+        }
+
+        function saveFile(content, name, type, isDataUrl = false) {
+            const link = document.createElement('a');
+            if (isDataUrl) {
+                link.href = content;
+            } else {
+                const blob = new Blob([content], { type: type });
+                link.href = URL.createObjectURL(blob);
+            }
+            link.download = name;
+            link.click();
+        }
+
+        function clearMap() { if(confirm("Clear All?")) drawnItems.clearLayers(); }
+        function showLoader(v) { document.getElementById('loader').style.display = v ? 'flex' : 'none'; }
+        function showToast(msg, err) {
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.style.borderLeft = err ? '4px solid #ef4444' : '4px solid #22c55e';
+            t.innerText = msg;
+            document.getElementById('toast-container').appendChild(t);
+            setTimeout(() => t.remove(), 3000);
+        }
+    </script>
+</body>
+</html>
