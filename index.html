@@ -3,163 +3,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoCanvas v5 | Hybrid & Live</title>
+    <title>GeoCanvas v11 | Shareable Maps</title>
     
-    <!-- External Libraries -->
+    <!-- Leaflet Core -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Draw -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <!-- Search & Utils -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css" />
+    <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --primary: #2563eb;
-            --primary-hover: #1d4ed8;
             --surface: #ffffff;
             --bg: #f8fafc;
             --text-main: #0f172a;
-            --text-muted: #64748b;
             --border: #e2e8f0;
             --danger: #ef4444;
             --sidebar-width: 360px;
         }
 
-        * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; overflow: hidden; background: var(--bg); }
-        
         .app-container { display: flex; height: 100vh; width: 100vw; }
+        * { box-sizing: border-box; }
 
         /* --- Sidebar --- */
         .sidebar {
-            width: var(--sidebar-width);
-            background: var(--surface);
-            border-right: 1px solid var(--border);
-            display: flex; flex-direction: column;
-            z-index: 1001;
-            box-shadow: 4px 0 24px rgba(0,0,0,0.05);
+            width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; z-index: 1001; box-shadow: 4px 0 24px rgba(0,0,0,0.05);
         }
-
-        .sidebar-header {
-            padding: 20px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-        }
-
+        .sidebar-header { padding: 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
         .app-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
-        .brand-icon {
-            width: 32px; height: 32px; background: var(--primary); color: white;
-            border-radius: 8px; display: flex; align-items: center; justify-content: center;
-        }
-        .brand-text h1 { font-size: 18px; font-weight: 700; margin: 0; color: var(--text-main); }
-        .brand-text p { font-size: 11px; margin: 0; color: var(--text-muted); }
-
-        /* --- Live Search Bar --- */
-        .search-wrapper { position: relative; display: flex; gap: 8px; }
-        .search-input {
-            flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
-            font-size: 13px; outline: none; transition: border 0.2s;
-        }
-        .search-input:focus { border-color: var(--primary); }
+        .brand-icon { width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+        .brand-text h1 { font-size: 18px; font-weight: 700; margin: 0; }
         
-        /* Dropdown Results */
+        .search-wrapper { position: relative; display: flex; gap: 8px; }
+        .search-input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px; outline: none; }
         .search-results {
-            position: absolute; top: 100%; left: 0; right: 0;
-            background: white; border: 1px solid var(--border);
-            border-radius: 6px; margin-top: 4px;
-            max-height: 200px; overflow-y: auto;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            display: none; z-index: 2000;
+            position: absolute; top: 100%; left: 0; right: 0; background: white; 
+            border: 1px solid var(--border); border-radius: 6px; margin-top: 4px;
+            max-height: 200px; overflow-y: auto; display: none; z-index: 2000;
         }
-        .search-item {
-            padding: 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
-        }
+        .search-item { padding: 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
         .search-item:hover { background: #f8fafc; color: var(--primary); }
-        .search-item:last-child { border-bottom: none; }
 
-        /* --- Content Area --- */
-        .sidebar-content {
-            flex: 1; overflow-y: auto; padding: 20px;
-            display: flex; flex-direction: column; gap: 24px;
-        }
-
-        .tool-section h4 {
-            font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
-            color: var(--text-muted); margin: 0 0 10px 0; font-weight: 700;
-            display: flex; align-items: center; gap: 8px;
-        }
-        .tool-section h4::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-
-        /* --- Layer Grid --- */
-        .layer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-        .layer-btn {
-            border: 1px solid var(--border); border-radius: 6px; padding: 8px;
-            text-align: center; cursor: pointer; transition: all 0.2s; background: white;
-        }
-        .layer-btn img {
-            width: 100%; height: 40px; object-fit: cover; border-radius: 4px;
-            margin-bottom: 5px; filter: grayscale(100%);
-        }
-        .layer-btn span { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); }
-        .layer-btn.active { border-color: var(--primary); background: #eff6ff; }
-        .layer-btn.active img { filter: none; }
-        .layer-btn.active span { color: var(--primary); }
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+        .tool-section h4 { font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 10px 0; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
 
         /* --- Controls --- */
         .control-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-        
         .btn {
-            background: white; border: 1px solid var(--border); color: var(--text-main);
-            padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
-            display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1;
-            transition: all 0.2s;
+            background: white; border: 1px solid var(--border); color: var(--text-main); padding: 10px; 
+            border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: flex; 
+            align-items: center; justify-content: center; gap: 8px; flex: 1; transition: all 0.2s;
         }
         .btn:hover { background: #f1f5f9; }
+        .btn.active { background: #eff6ff; border-color: var(--primary); color: var(--primary); }
         .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
-        .btn.primary:hover { background: var(--primary-hover); }
-        .btn.active {
-            background: #eff6ff; border-color: var(--primary); color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
-        }
-        
+        .btn.primary:hover { background: #1d4ed8; }
+        .btn-edit-mode { background: #fdf4ff; color: #a21caf; border-color: #f0abfc; }
+        .btn-edit-mode.active { background: #a21caf; color: white; border-color: #a21caf; }
+
         input[type="number"] { width: 80px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
         input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: none; }
 
-        /* --- Map --- */
+        /* --- Layer Grid --- */
+        .layer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .layer-btn { border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center; cursor: pointer; background: white; }
+        .layer-btn img { width: 100%; height: 40px; object-fit: cover; border-radius: 4px; filter: grayscale(100%); }
+        .layer-btn.active { border-color: var(--primary); background: #eff6ff; }
+        .layer-btn.active img { filter: none; }
+        .layer-btn span { display: block; font-size: 11px; font-weight: 600; margin-top: 5px; }
+
+        /* --- Map & Overlays --- */
         .map-wrapper { flex: 1; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
-
-        /* --- Toasts & Loader --- */
-        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 2000; }
-        .toast {
-            background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px;
-            margin-top: 10px; font-size: 13px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
-            animation: slideUp 0.3s ease; display: flex; align-items: center; gap: 10px;
-        }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-        .loader {
-            position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 3000;
-            display: none; align-items: center; justify-content: center; flex-direction: column;
-        }
-        .spinner {
-            width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--primary);
-            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
+        
         .custom-label {
             background: rgba(255, 255, 255, 0.95); padding: 4px 8px; border-radius: 4px;
             border: 1px solid #333; font-weight: 600; font-size: 12px; white-space: nowrap;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;
         }
         
-        /* Mobile */
-        @media (max-width: 768px) {
-            .app-container { flex-direction: column-reverse; }
-            .sidebar { width: 100%; height: 50%; border-right: none; border-top: 1px solid var(--border); }
-            .map-wrapper { height: 50%; }
+        /* Radius Label Tooltip Style */
+        .radius-label {
+            background: transparent; border: none; box-shadow: none;
+            color: #333; font-weight: 800; font-size: 12px;
+            text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
         }
+
+        #context-menu {
+            position: absolute; display: none; background: white; border: 1px solid var(--border);
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 220px; z-index: 3000;
+            padding: 12px; font-family: 'Inter', sans-serif;
+        }
+        #context-menu h5 { margin: 0 0 10px 0; font-size: 13px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .ctx-group { margin-bottom: 10px; }
+        .ctx-input { width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+        .ctx-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+        #draw-helper {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); color: white; padding: 8px 16px; border-radius: 20px;
+            font-size: 12px; z-index: 2000; display: none; pointer-events: none;
+        }
+
+        /* Share Modal */
+        #share-modal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 4000;
+            align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: white; padding: 20px; border-radius: 8px; width: 400px; max-width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .url-box {
+            width: 100%; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 10px;
+            font-size: 12px; color: #475569; word-break: break-all; border-radius: 4px;
+            margin: 10px 0; max-height: 80px; overflow-y: auto;
+        }
+
+        /* Snap Marker */
+        .snap-marker {
+            background: transparent; border: 2px solid #facc15; border-radius: 50%;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.3); pointer-events: none;
+        }
+
+        /* Loader */
+        #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 2000; }
+        .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-top: 10px; font-size: 13px; animation: slideUp 0.3s ease; display: flex; align-items: center; gap: 10px; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .loader { position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 3000; display: none; align-items: center; justify-content: center; flex-direction: column; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) { .app-container { flex-direction: column-reverse; } .sidebar { width: 100%; height: 50%; } }
     </style>
 </head>
 <body>
@@ -168,454 +155,576 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="app-brand">
-                    <div class="brand-icon"><i class="fa-solid fa-map-location-dot"></i></div>
-                    <div class="brand-text">
-                        <h1>GeoCanvas v5</h1>
-                        <p>Studio Edition</p>
-                    </div>
+                    <div class="brand-icon"><i class="fa-solid fa-share-nodes"></i></div>
+                    <div class="brand-text"><h1>GeoCanvas v11</h1><p>Share & Collaborate</p></div>
                 </div>
-                
-                <!-- Live Search Bar -->
                 <div class="search-wrapper">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search Bengaluru, India..." oninput="handleSearchInput(this.value)">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search Bengaluru..." oninput="handleSearchInput(this.value)">
                     <div id="searchResults" class="search-results"></div>
                 </div>
             </div>
 
             <div class="sidebar-content">
-                
-                <!-- 1. Map Layers (Hybrid Added) -->
                 <div class="tool-section">
                     <h4>Map Layers</h4>
                     <div class="layer-grid">
                         <div class="layer-btn active" onclick="changeLayer('street', this)">
-                            <img src="https://a.tile.openstreetmap.org/12/2929/1898.png" alt="Street">
-                            <span>Street</span>
+                            <img src="https://a.tile.openstreetmap.org/12/2929/1898.png"><span>Street</span>
                         </div>
-                        <div class="layer-btn" onclick="changeLayer('satellite', this)">
-                            <!-- Hybrid Icon Preview -->
-                            <img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1898/2929" alt="Sat">
-                            <span>Hybrid</span>
+                        <div class="layer-btn" onclick="changeLayer('google', this)">
+                            <img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1898/2929"><span>Hybrid</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('dark', this)">
-                            <img src="https://a.basemaps.cartocdn.com/dark_all/12/2929/1898.png" alt="Dark">
-                            <span>Dark</span>
+                            <img src="https://a.basemaps.cartocdn.com/dark_all/12/2929/1898.png"><span>Dark</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. Styling -->
+                <div class="tool-section">
+                    <h4>Interaction Mode</h4>
+                    <button id="btnEditMode" class="btn btn-edit-mode" onclick="toggleEditMode()">
+                        <i class="fa-solid fa-lock"></i> <span>Unlock / Edit Layout</span>
+                    </button>
+                    <div style="font-size:11px; color:#64748b; margin-top:5px;">
+                        Unlock to drag circles, text, and shapes.
+                    </div>
+                </div>
+
                 <div class="tool-section">
                     <h4>Style</h4>
                     <div class="control-row">
                         <input type="color" id="colorPicker" value="#2563eb">
-                        <div style="font-size:12px; color:var(--text-muted);">
-                            <strong>Active Color</strong><br>Applies to new items
-                        </div>
+                        <div style="font-size:11px; color:#64748b;"><strong>Color</strong><br>Right-click items to change</div>
                     </div>
                 </div>
 
-                <!-- 3. Fixed Circle Tool -->
                 <div class="tool-section" style="background: #f0f9ff; padding: 10px; border-radius: 8px; border: 1px solid #bae6fd;">
-                    <h4 style="color: #0369a1; border:none;"><i class="fa-regular fa-circle-dot"></i> Precision Circle</h4>
+                    <h4 style="color: #0369a1; border:none; margin-bottom:5px;"><i class="fa-regular fa-circle-dot"></i> Fixed Circle</h4>
                     <div class="control-row">
                         <input type="number" id="radiusInput" value="5" min="0.1" step="0.1">
                         <span style="font-size: 13px; font-weight: 600;">km</span>
-                        <button class="btn primary" id="btnFixedCircle" onclick="activateTool('fixedCircle')">
-                            Place
-                        </button>
+                        <button class="btn primary" id="btnFixedCircle" onclick="activateTool('fixedCircle')">Place</button>
                     </div>
                 </div>
 
-                <!-- 4. Text & Freehand -->
                 <div class="tool-section">
-                    <h4>Tools</h4>
+                    <h4>Draw & Label</h4>
                     <div class="control-row">
-                        <button class="btn" id="btnDrawLine" onclick="activateTool('polyline')">
-                            <i class="fa-solid fa-route"></i> Line
-                        </button>
-                        <button class="btn" id="btnDrawPoly" onclick="activateTool('polygon')">
-                            <i class="fa-solid fa-draw-polygon"></i> Area
-                        </button>
+                        <button class="btn" id="btnDrawLine" onclick="activateTool('polyline')"><i class="fa-solid fa-route"></i> Line</button>
+                        <button class="btn" id="btnDrawPoly" onclick="activateTool('polygon')"><i class="fa-solid fa-draw-polygon"></i> Area</button>
                     </div>
-                    <button class="btn" id="btnTextTool" onclick="activateTool('text')" style="width:100%">
-                        <i class="fa-solid fa-font"></i> Add Text Label
-                    </button>
+                    <button class="btn" id="btnTextTool" onclick="activateTool('text')" style="width:100%"><i class="fa-solid fa-font"></i> Text Label</button>
                 </div>
 
-                <!-- 5. Data -->
                 <div class="tool-section" style="margin-top:auto">
-                    <h4>Export</h4>
+                    <h4>Share & Export</h4>
+                    <button class="btn primary" onclick="generateShareLink()" style="width:100%; margin-bottom:10px; background:#7c3aed; border-color:#7c3aed;">
+                        <i class="fa-solid fa-link"></i> Share / Save Link
+                    </button>
                     <div class="control-row">
-                        <button class="btn" onclick="downloadJSON()"><i class="fa-solid fa-file-code"></i> Save</button>
-                        <button class="btn" onclick="document.getElementById('fileInput').click()"><i class="fa-solid fa-folder-open"></i> Load</button>
+                        <button class="btn" onclick="downloadJSON()">Save JSON</button>
+                        <button class="btn" onclick="document.getElementById('fileInput').click()">Load JSON</button>
                         <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(this)">
                     </div>
-                    <button class="btn primary" onclick="exportImage()" style="width:100%">
-                        <i class="fa-solid fa-image"></i> Download Image
-                    </button>
-                    <button class="btn" onclick="clearMap()" style="width:100%; margin-top:10px; color: var(--danger); border-color: #fee2e2;">
-                        <i class="fa-solid fa-trash"></i> Clear Canvas
-                    </button>
+                    <button class="btn primary" onclick="exportImage()" style="width:100%"><i class="fa-solid fa-image"></i> Download Image</button>
+                    <button class="btn" onclick="clearMap()" style="width:100%; margin-top:10px; color: var(--danger); border-color: #fee2e2;">Clear All</button>
                 </div>
             </div>
         </aside>
 
         <div class="map-wrapper">
             <div id="map"></div>
+            <div id="draw-helper">Snapping Active. Click last point again to finish.</div>
+            
+            <!-- Context Menu -->
+            <div id="context-menu">
+                <h5 id="ctx-title">Edit Element</h5>
+                <div class="ctx-group" id="ctx-text-group" style="display:none;">
+                    <label>Label Text</label>
+                    <input type="text" id="ctx-text-input" class="ctx-input">
+                </div>
+                <div class="ctx-group" id="ctx-radius-group" style="display:none;">
+                    <label>Radius (km)</label>
+                    <input type="number" id="ctx-radius-input" class="ctx-input" step="0.1">
+                </div>
+                <div class="ctx-group">
+                    <label>Color</label>
+                    <input type="color" id="ctx-color-input" style="width:100%; height:30px; cursor:pointer;">
+                </div>
+                <div class="ctx-actions">
+                    <button class="btn primary" onclick="saveContextEdit()">Save</button>
+                    <button class="btn" style="color:var(--danger); border-color:#fee2e2; background:#fef2f2;" onclick="deleteContextLayer()">Delete</button>
+                </div>
+            </div>
+
+            <!-- Share Modal -->
+            <div id="share-modal">
+                <div class="modal-content">
+                    <h3 style="margin-top:0">Share Map</h3>
+                    <p style="font-size:13px; color:#666;">Copy this link to save or share your current map state.</p>
+                    <div class="url-box" id="share-url-box"></div>
+                    <div class="control-row">
+                        <button class="btn primary" onclick="copyShareLink()">Copy Link</button>
+                        <button class="btn" onclick="document.getElementById('share-modal').style.display='none'">Close</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <div id="toast-container"></div>
     <div class="loader" id="loader"><div class="spinner"></div><p>Processing...</p></div>
 
-    <!-- Scripts -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-
     <script>
         // --- Globals ---
-        let map;
-        let drawnItems;
-        let activeTool = null;
-        let nativeDrawHandler = null;
+        let map, drawnItems, helperLayer, activeTool, nativeDrawHandler, searchTimeout;
+        let ctxTargetLayer = null;
+        let editHandler = null;
+        let isEditMode = false;
+        let snapMarker = null;
+        let snapTarget = null;
         const layers = {};
-        let searchTimeout;
 
-        // --- 1. Init Map (Bengaluru Default) ---
+        // --- 1. Init Map ---
         function initMap() {
-            // Bengaluru Coordinates: 12.9716, 77.5946
             map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
             L.control.zoom({ position: 'topright' }).addTo(map);
             L.control.scale({ metric: true, imperial: true, position: 'bottomright' }).addTo(map);
 
-            // Layer: Street
-            layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap', crossOrigin: true
-            });
+            // Layers
+            layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', crossOrigin: true });
             
-            // Layer: Hybrid (Satellite + Roads/Labels)
-            const satImg = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: '© Esri', crossOrigin: true
-            });
-            const satLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
-                attribution: '© CartoDB', crossOrigin: true
-            });
-            layers.satellite = L.layerGroup([satImg, satLabels]);
+            // Hybrid
+            const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', crossOrigin: true });
+            const roads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', crossOrigin: true });
+            layers.google = L.layerGroup([sat, roads]);
 
-            // Layer: Dark
-            layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '© CartoDB', crossOrigin: true
-            });
+            layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', crossOrigin: true });
 
-            // Default Layer
             layers.street.addTo(map);
 
-            // Feature Group
             drawnItems = new L.FeatureGroup();
             map.addLayer(drawnItems);
+            
+            helperLayer = new L.LayerGroup();
+            map.addLayer(helperLayer);
+
+            // Edit Handler - Removed 'dashArray' for solid selection lines
+            editHandler = new L.EditToolbar.Edit(map, {
+                featureGroup: drawnItems,
+                selectedPathOptions: { maintainColor: true, opacity: 0.8, weight: 4 } // Solid lines
+            });
+
+            map.on('click', closeContextMenu);
+            map.on('movestart', closeContextMenu);
+            map.on('mousemove', handleSnapMove);
+
+            // Check for Share URL Params
+            checkForShareData();
         }
         
+        // Call Init
         initMap();
 
-        // --- 2. Live Search Logic ---
-        async function handleSearchInput(query) {
-            const resultsContainer = document.getElementById('searchResults');
-            
-            // Clear previous timeout (debounce)
-            clearTimeout(searchTimeout);
-
-            if (!query || query.length < 3) {
-                resultsContainer.style.display = 'none';
-                return;
-            }
-
-            // Debounce: Wait 400ms after typing stops before searching
-            searchTimeout = setTimeout(async () => {
-                const provider = new window.GeoSearch.OpenStreetMapProvider();
-                try {
-                    const results = await provider.search({ query: query });
-                    displaySearchResults(results);
-                } catch (e) {
-                    console.error("Search error", e);
+        // --- 2. Shareable URL Logic ---
+        function generateShareLink() {
+            const features = [];
+            drawnItems.eachLayer(layer => {
+                if (layer instanceof L.Circle) {
+                    features.push({
+                        type: 'circle',
+                        lat: layer.getLatLng().lat,
+                        lng: layer.getLatLng().lng,
+                        radius: layer.getRadius(),
+                        color: layer.options.color
+                    });
+                } else if (layer instanceof L.Marker && layer.feature && layer.feature.properties.type === 'text') {
+                    features.push({
+                        type: 'text',
+                        lat: layer.getLatLng().lat,
+                        lng: layer.getLatLng().lng,
+                        content: layer.feature.properties.content,
+                        color: layer.feature.properties.color
+                    });
+                } else if (layer.toGeoJSON) {
+                    // Lines / Polygons
+                    const f = layer.toGeoJSON();
+                    f.properties.color = layer.options.color;
+                    features.push(f);
                 }
-            }, 400);
-        }
-
-        function displaySearchResults(results) {
-            const container = document.getElementById('searchResults');
-            container.innerHTML = '';
-            
-            if (results.length === 0) {
-                container.style.display = 'none';
-                return;
-            }
-
-            results.forEach(result => {
-                const item = document.createElement('div');
-                item.className = 'search-item';
-                item.innerText = result.label;
-                item.onclick = () => {
-                    // Fly to location
-                    map.setView([result.y, result.x], 13);
-                    // Add temp popup
-                    L.popup().setLatLng([result.y, result.x]).setContent(`<b>${result.label}</b>`).openOn(map);
-                    // Clear input and hide
-                    document.getElementById('searchInput').value = '';
-                    container.style.display = 'none';
-                };
-                container.appendChild(item);
             });
-            container.style.display = 'block';
+
+            const state = {
+                c: [map.getCenter().lat, map.getCenter().lng],
+                z: map.getZoom(),
+                d: features
+            };
+
+            // Encode
+            const json = JSON.stringify(state);
+            const encoded = btoa(unescape(encodeURIComponent(json))); // Base64 safety
+            const url = window.location.origin + window.location.pathname + '?map=' + encoded;
+
+            document.getElementById('share-url-box').innerText = url;
+            document.getElementById('share-modal').style.display = 'flex';
         }
 
-        // Close dropdown if clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.search-wrapper')) {
-                document.getElementById('searchResults').style.display = 'none';
-            }
-        });
+        function copyShareLink() {
+            const text = document.getElementById('share-url-box').innerText;
+            navigator.clipboard.writeText(text).then(() => showToast('Link copied!'));
+        }
 
-        // --- 3. Tool Logic ---
+        function checkForShareData() {
+            const params = new URLSearchParams(window.location.search);
+            const mapData = params.get('map');
+            if (mapData) {
+                try {
+                    const json = decodeURIComponent(escape(atob(mapData)));
+                    const state = JSON.parse(json);
+                    
+                    // Restore View
+                    map.setView(state.c, state.z);
+                    
+                    // Restore Items
+                    state.d.forEach(item => {
+                        restoreItem(item);
+                    });
+                    showToast('Map restored from link');
+                } catch (e) {
+                    console.error(e);
+                    showToast('Invalid Share Link', true);
+                }
+            }
+        }
+
+        function restoreItem(item) {
+            let layer;
+            if (item.type === 'circle') {
+                const latlng = [item.lat, item.lng];
+                layer = createCircleLayer(latlng, item.radius, item.color);
+            } else if (item.type === 'text') {
+                const latlng = [item.lat, item.lng];
+                layer = createTextLayer(latlng, item.content, item.color);
+            } else if (item.type === 'Feature') {
+                // Line / Polygon
+                L.geoJSON(item, {
+                    style: { color: item.properties.color, weight: 4, opacity: 1 }, // Solid lines
+                    onEachFeature: (f, l) => {
+                        l.options.color = item.properties.color; // Persist for edit
+                        layer = l;
+                        attachContextMenu(l);
+                        drawnItems.addLayer(l);
+                    }
+                });
+            }
+        }
+
+        // --- 3. Helper Generators (Shared by Draw/Load) ---
+        function createCircleLayer(latlng, radius, color) {
+            const circle = L.circle(latlng, { color: color, fillColor: color, fillOpacity: 0.2, radius: radius });
+            const dot = L.circleMarker(latlng, { radius: 3, color: '#fff', weight: 1, fillColor: color, fillOpacity: 1, interactive: false });
+            const rim = getDestinationPoint(latlng, 90, radius);
+            // Dotted radius line
+            const line = L.polyline([latlng, rim], { color: color, weight: 2, dashArray: '5, 5', interactive: false });
+            
+            // Permanent Label for Radius
+            const km = (radius / 1000).toFixed(2) + ' km';
+            line.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
+
+            circle.centerDot = dot; circle.radiusLine = line;
+            circle.feature = { type: 'Feature', properties: { type: 'circle', radius: radius, color: color } };
+            
+            attachContextMenu(circle);
+            drawnItems.addLayer(circle);
+            helperLayer.addLayer(dot); helperLayer.addLayer(line);
+            return circle;
+        }
+
+        function createTextLayer(latlng, text, color) {
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="custom-label" style="color:${color}; border-color:${color}">${text}</div>`,
+                iconSize: [null, null], iconAnchor: [20, 10]
+            });
+            const marker = L.marker(latlng, { icon: icon, draggable: isEditMode });
+            marker.feature = { type: 'Feature', properties: { type: 'text', content: text, color: color } };
+            attachContextMenu(marker);
+            drawnItems.addLayer(marker);
+            return marker;
+        }
+
+        // --- 4. Drawing & Snapping ---
         function activateTool(toolName) {
             resetTools();
             activeTool = toolName;
             const color = document.getElementById('colorPicker').value;
 
             if (toolName === 'polyline' || toolName === 'polygon') {
-                if (toolName === 'polyline') {
-                    nativeDrawHandler = new L.Draw.Polyline(map, { shapeOptions: { color: color, weight: 4 } });
-                } else {
-                    nativeDrawHandler = new L.Draw.Polygon(map, { shapeOptions: { color: color } });
-                }
+                document.getElementById('draw-helper').style.display = 'block';
+                const handler = (toolName === 'polyline') ? L.Draw.Polyline : L.Draw.Polygon;
+                nativeDrawHandler = new handler(map, { 
+                    shapeOptions: { color: color, weight: 4, opacity: 1 }, // Solid Lines
+                    allowIntersection: false
+                });
                 nativeDrawHandler.enable();
-                updateUI(toolName === 'polyline' ? 'btnDrawLine' : 'btnDrawPoly');
-            }
-            else if (toolName === 'fixedCircle') {
-                updateUI('btnFixedCircle');
+            } else if (toolName === 'fixedCircle') {
+                document.getElementById('btnFixedCircle').classList.add('active');
                 map.getContainer().style.cursor = 'copy';
                 showToast('Click map to place circle');
-            }
-            else if (toolName === 'text') {
-                updateUI('btnTextTool');
+            } else if (toolName === 'text') {
+                document.getElementById('btnTextTool').classList.add('active');
                 map.getContainer().style.cursor = 'text';
                 showToast('Click map to add text');
             }
         }
 
+        function handleSnapMove(e) {
+            if (!activeTool || (activeTool !== 'polyline' && activeTool !== 'polygon')) return;
+            let minDist = Infinity;
+            let nearest = null;
+            drawnItems.eachLayer(layer => {
+                if (layer instanceof L.Polygon || layer instanceof L.Polyline) {
+                    const latlngs = layer.getLatLngs();
+                    const flat = Array.isArray(latlngs[0]) ? latlngs.flat(2) : latlngs;
+                    flat.forEach(pt => {
+                        const pxDist = map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(pt));
+                        if (pxDist < 20 && pxDist < minDist) { minDist = pxDist; nearest = pt; }
+                    });
+                }
+            });
+            if (nearest) {
+                if (!snapMarker) snapMarker = L.marker(nearest, { icon: L.divIcon({ className: 'snap-marker', iconSize: [16, 16], iconAnchor: [8, 8] }), interactive: false }).addTo(map);
+                else { snapMarker.setLatLng(nearest); snapMarker.setOpacity(1); }
+                snapTarget = nearest;
+            } else {
+                if (snapMarker) snapMarker.setOpacity(0);
+                snapTarget = null;
+            }
+        }
+
         function resetTools() {
             activeTool = null;
-            if (nativeDrawHandler) {
-                nativeDrawHandler.disable();
-                nativeDrawHandler = null;
-            }
+            document.getElementById('draw-helper').style.display = 'none';
+            if (nativeDrawHandler) { nativeDrawHandler.disable(); nativeDrawHandler = null; }
             document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            if(isEditMode) document.getElementById('btnEditMode').classList.add('active');
             map.getContainer().style.cursor = '';
+            if(snapMarker) snapMarker.setOpacity(0);
         }
 
-        function updateUI(activeId) {
-            if(activeId) document.getElementById(activeId).classList.add('active');
-        }
-
-        // --- 4. Map Click Handler (Circle Center Logic) ---
         map.on('click', function(e) {
             const color = document.getElementById('colorPicker').value;
-
             if (activeTool === 'fixedCircle') {
                 const km = parseFloat(document.getElementById('radiusInput').value) || 5;
-                const radiusMeters = km * 1000;
-
-                // 1. Create the Main Circle
-                const circle = L.circle(e.latlng, {
-                    color: color,
-                    fillColor: color,
-                    fillOpacity: 0.2,
-                    radius: radiusMeters
-                });
-                
-                // 2. Create the Center Point
-                const centerDot = L.circleMarker(e.latlng, {
-                    radius: 3,
-                    color: '#fff',
-                    weight: 1,
-                    fillColor: color,
-                    fillOpacity: 1
-                });
-                
-                const group = L.layerGroup([circle, centerDot]);
-                
-                // Add metadata to the Circle (for JSON export)
-                // We attach feature data to the circle layer, the dot is purely visual
-                circle.feature = {
-                    type: 'Feature',
-                    properties: { type: 'circle', radius: radiusMeters, radiusKm: km, color: color, hasCenter: true }
-                };
-                // We bind the group to drawnItems so they can be cleared together, 
-                // but for Leaflet Draw compatibility we add them individually
-                drawnItems.addLayer(circle);
-                drawnItems.addLayer(centerDot);
-
-                circle.bindPopup(`<b>Radius:</b> ${km} km`).openPopup();
-            }
-            else if (activeTool === 'text') {
+                createCircleLayer(e.latlng, km * 1000, color);
+            } else if (activeTool === 'text') {
                 setTimeout(() => {
-                    const text = prompt("Enter Label Text:");
-                    if (text) {
-                        const icon = L.divIcon({
-                            className: 'custom-div-icon',
-                            html: `<div class="custom-label" style="color:${color}; border-color:${color}">${text}</div>`,
-                            iconSize: [null, null], iconAnchor: [20, 10]
-                        });
-                        const marker = L.marker(e.latlng, { icon: icon });
-                        marker.feature = {
-                            type: 'Feature',
-                            properties: { type: 'text', content: text, color: color }
-                        };
-                        drawnItems.addLayer(marker);
-                        resetTools();
-                    }
+                    const text = prompt("Enter Text:");
+                    if (text) { createTextLayer(e.latlng, text, color); resetTools(); }
                 }, 50);
             }
         });
 
-        // Handle Leaflet Draw Created Event
         map.on(L.Draw.Event.CREATED, function (e) {
-            const layer = e.layer;
-            const color = document.getElementById('colorPicker').value;
-            if (layer.setStyle) layer.setStyle({ color: color, fillColor: color });
-            layer.feature = layer.feature || { type: 'Feature', properties: {} };
-            layer.feature.properties.color = color;
-            drawnItems.addLayer(layer);
+            const l = e.layer;
+            const c = document.getElementById('colorPicker').value;
+            if(l.setStyle) l.setStyle({ color:c, fillColor:c, weight: 4 });
+            l.feature = { type:'Feature', properties:{ color:c } };
+            attachContextMenu(l);
+            drawnItems.addLayer(l);
+            if(isEditMode) { editHandler.removeHooks(); editHandler.addHooks(); }
+            resetTools();
         });
 
-        // --- 5. Layer Switching ---
-        function changeLayer(type, btn) {
-            map.eachLayer((layer) => {
-                // Remove existing base layers only
-                if(layer !== drawnItems && layer !== map.zoomControl && !layer._url?.includes('tile.openstreetmap.org')) {
-                    // Safe removal logic depends on identifying tile layers
-                }
-            });
-            // Brute force: Remove all known layers, re-add
-            map.removeLayer(layers.street);
-            map.removeLayer(layers.satellite);
-            map.removeLayer(layers.dark);
+        // --- 5. Helpers Logic (Move/Update) ---
+        function getDestinationPoint(latlng, heading, distance) {
+            const R = 6378137; const rad = Math.PI / 180;
+            const lat1 = latlng.lat * rad; const lon1 = latlng.lng * rad;
+            const angDist = distance / R; const trueCourse = heading * rad;
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angDist) + Math.cos(lat1) * Math.sin(angDist) * Math.cos(trueCourse));
+            const lon2 = lon1 + Math.atan2(Math.sin(trueCourse) * Math.sin(angDist) * Math.cos(lat1), Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2));
+            return L.latLng(lat2 / rad, lon2 / rad);
+        }
 
-            layers[type].addTo(map);
+        function updateCircleHelpers(circle) {
+            if (!circle.centerDot || !circle.radiusLine) return;
+            const center = circle.getLatLng();
+            const radius = circle.getRadius();
+            
+            // 1. Move Center Dot
+            circle.centerDot.setLatLng(center);
+            
+            // 2. Update Radius Line & Tooltip
+            const rim = getDestinationPoint(center, 90, radius);
+            circle.radiusLine.setLatLngs([center, rim]);
+            
+            const km = (radius / 1000).toFixed(2) + ' km';
+            if(circle.radiusLine.getTooltip()) {
+                circle.radiusLine.setTooltipContent(km);
+            } else {
+                circle.radiusLine.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
+            }
+        }
 
+        // --- 6. Edit & Context Menu ---
+        function toggleEditMode() {
+            isEditMode = !isEditMode;
+            const btn = document.getElementById('btnEditMode');
+            if (isEditMode) {
+                btn.classList.add('active');
+                btn.innerHTML = '<i class="fa-solid fa-lock-open"></i> <span>Editing Unlocked</span>';
+                editHandler.enable();
+                drawnItems.eachLayer(l => { if(l instanceof L.Marker && l.dragging) l.dragging.enable(); });
+                showToast("Drag items to move");
+            } else {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fa-solid fa-lock"></i> <span>Unlock / Edit Layout</span>';
+                editHandler.disable();
+                drawnItems.eachLayer(l => { if(l instanceof L.Marker && l.dragging) l.dragging.disable(); });
+                editHandler.save();
+            }
+        }
+
+        function attachContextMenu(layer) {
+            layer.on('contextmenu', e => { L.DomEvent.stopPropagation(e); openContextMenu(e, layer); });
+            if (layer instanceof L.Circle) {
+                layer.on('move', () => updateCircleHelpers(layer)); 
+                layer.on('drag', () => updateCircleHelpers(layer)); 
+                layer.on('edit', () => updateCircleHelpers(layer)); 
+            }
+        }
+
+        function openContextMenu(e, layer) {
+            ctxTargetLayer = layer;
+            const menu = document.getElementById('context-menu');
+            document.getElementById('ctx-text-group').style.display = 'none';
+            document.getElementById('ctx-radius-group').style.display = 'none';
+            
+            if (layer instanceof L.Circle) {
+                document.getElementById('ctx-radius-group').style.display = 'block';
+                document.getElementById('ctx-radius-input').value = (layer.getRadius()/1000).toFixed(2);
+                document.getElementById('ctx-color-input').value = layer.options.color || '#2563eb';
+            } else if (layer instanceof L.Marker) {
+                document.getElementById('ctx-text-group').style.display = 'block';
+                const div = document.createElement('div'); div.innerHTML = layer.options.icon.options.html;
+                document.getElementById('ctx-text-input').value = div.innerText;
+                const match = div.innerHTML.match(/color:(#[0-9a-fA-F]+)/);
+                if(match) document.getElementById('ctx-color-input').value = match[1];
+            } else {
+                document.getElementById('ctx-color-input').value = layer.options.color || '#2563eb';
+            }
+            const pt = map.mouseEventToContainerPoint(e.originalEvent);
+            menu.style.left = pt.x + 'px'; menu.style.top = pt.y + 'px';
+            menu.style.display = 'block';
+        }
+
+        function closeContextMenu() { document.getElementById('context-menu').style.display='none'; }
+
+        function saveContextEdit() {
+            if (!ctxTargetLayer) return;
+            const color = document.getElementById('ctx-color-input').value;
+            if (ctxTargetLayer instanceof L.Circle) {
+                const m = parseFloat(document.getElementById('ctx-radius-input').value) * 1000;
+                ctxTargetLayer.setRadius(m);
+                ctxTargetLayer.setStyle({ color: color, fillColor: color });
+                if(ctxTargetLayer.centerDot) ctxTargetLayer.centerDot.setStyle({ fillColor: color });
+                if(ctxTargetLayer.radiusLine) ctxTargetLayer.radiusLine.setStyle({ color: color });
+                updateCircleHelpers(ctxTargetLayer);
+                if(ctxTargetLayer.feature) { ctxTargetLayer.feature.properties.radius = m; ctxTargetLayer.feature.properties.color = color; }
+            } else if (ctxTargetLayer instanceof L.Marker) {
+                const txt = document.getElementById('ctx-text-input').value;
+                ctxTargetLayer.setIcon(L.divIcon({
+                    className:'custom-div-icon', 
+                    html:`<div class="custom-label" style="color:${color}; border-color:${color}">${txt}</div>`,
+                    iconSize:[null,null], iconAnchor:[20,10]
+                }));
+                if(ctxTargetLayer.feature) ctxTargetLayer.feature.properties = { type:'text', content:txt, color:color };
+            } else {
+                ctxTargetLayer.setStyle({ color: color, fillColor: color });
+                if(ctxTargetLayer.feature) ctxTargetLayer.feature.properties.color = color;
+            }
+            closeContextMenu();
+        }
+
+        function deleteContextLayer() {
+            if (ctxTargetLayer) {
+                if(ctxTargetLayer.centerDot) helperLayer.removeLayer(ctxTargetLayer.centerDot);
+                if(ctxTargetLayer.radiusLine) helperLayer.removeLayer(ctxTargetLayer.radiusLine);
+                drawnItems.removeLayer(ctxTargetLayer);
+                closeContextMenu();
+            }
+        }
+
+        // --- 7. Export & Utils ---
+        function exportImage() {
+            document.getElementById('loader').style.display='flex';
+            const ctrl = document.querySelectorAll('.leaflet-control-container, .leaflet-draw-tooltip');
+            ctrl.forEach(c => c.style.display='none');
+            
+            // Force manual sync of transforms for capture (Leaflet + html2canvas fix)
+            const mapEl = document.getElementById('map');
+            
+            setTimeout(() => {
+                html2canvas(mapEl, {
+                    useCORS: true, allowTaint: false,
+                    width: mapEl.offsetWidth, height: mapEl.offsetHeight,
+                    scrollX: 0, scrollY: 0
+                }).then(c => {
+                    const a = document.createElement('a');
+                    a.href = c.toDataURL(); a.download='map-export.png'; a.click();
+                    ctrl.forEach(c => c.style.display='block');
+                    document.getElementById('loader').style.display='none';
+                });
+            }, 800);
+        }
+
+        function changeLayer(t, btn) {
+            map.eachLayer(l => { if(l!==drawnItems && l!==helperLayer && l!==map.zoomControl && !l._url?.includes('tile.openstreetmap')) {} }); 
+            map.removeLayer(layers.street); map.removeLayer(layers.google); map.removeLayer(layers.dark);
+            layers[t].addTo(map);
             document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         }
 
-        // --- 6. Import/Export ---
         function downloadJSON() {
-            const geojson = { type: "FeatureCollection", features: [] };
-            
-            drawnItems.eachLayer(layer => {
-                let f;
-                // Ignore the center dots in JSON (they are recreated on load if needed)
-                if (layer instanceof L.CircleMarker && !(layer instanceof L.Circle)) return; 
-
-                if (layer instanceof L.Circle && layer.feature) {
-                    f = {
-                        type: "Feature",
-                        properties: layer.feature.properties,
-                        geometry: { type: "Point", coordinates: [layer.getLatLng().lng, layer.getLatLng().lat] }
-                    };
-                } else if (layer.toGeoJSON) {
-                    f = layer.toGeoJSON();
-                    if(layer.options.color) f.properties.color = layer.options.color;
-                    if(layer.feature) f.properties = { ...f.properties, ...layer.feature.properties };
+            const gj = { type:"FeatureCollection", features:[] };
+            drawnItems.eachLayer(l => {
+                if(l.toGeoJSON) {
+                    const f = l.toGeoJSON();
+                    if(l instanceof L.Circle) f.geometry = { type:"Point", coordinates:[l.getLatLng().lng, l.getLatLng().lat] };
+                    f.properties = l.feature ? l.feature.properties : {};
+                    gj.features.push(f);
                 }
-                if(f) geojson.features.push(f);
             });
-
-            saveFile(JSON.stringify(geojson, null, 2), `map-${Date.now()}.json`, 'application/json');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(gj)], {type:'application/json'}));
+            a.download = `map-${Date.now()}.json`; a.click();
         }
 
         function loadJSON(input) {
-            const file = input.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    drawnItems.clearLayers();
-                    L.geoJSON(data, {
-                        pointToLayer: (feature, latlng) => {
-                            if(feature.properties.type === 'circle') {
-                                const c = L.circle(latlng, {
-                                    radius: feature.properties.radius,
-                                    color: feature.properties.color,
-                                    fillColor: feature.properties.color
-                                });
-                                c.feature = feature;
-                                
-                                // Re-add center point if loading a circle
-                                const dot = L.circleMarker(latlng, {
-                                    radius: 3, color: '#fff', weight: 1, fillColor: feature.properties.color, fillOpacity: 1
-                                });
-                                drawnItems.addLayer(dot);
-                                
-                                return c;
-                            }
-                            if(feature.properties.type === 'text') {
-                                const icon = L.divIcon({
-                                    className: 'custom-div-icon',
-                                    html: `<div class="custom-label" style="color:${feature.properties.color}; border-color:${feature.properties.color}">${feature.properties.content}</div>`
-                                });
-                                const m = L.marker(latlng, { icon: icon });
-                                m.feature = feature;
-                                return m;
-                            }
-                            return L.marker(latlng);
-                        },
-                        style: (f) => ({ color: f.properties.color, fillColor: f.properties.color })
-                    }).eachLayer(l => drawnItems.addLayer(l));
-                    
-                    if(drawnItems.getLayers().length) map.fitBounds(drawnItems.getBounds());
-                    showToast('Project Loaded');
-                } catch(err) { showToast('Invalid File', true); }
-            };
-            reader.readAsText(file);
-            input.value = '';
-        }
-
-        function exportImage() {
-            document.getElementById('loader').style.display = 'flex';
-            const controls = document.querySelectorAll('.leaflet-control-container');
-            controls.forEach(c => c.style.display = 'none');
-            setTimeout(() => {
-                html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: true }).then(canvas => {
-                    saveFile(canvas.toDataURL(), 'map-image.png', 'image/png', true);
-                    controls.forEach(c => c.style.display = 'block');
-                    document.getElementById('loader').style.display = 'none';
+            const f = input.files[0]; if(!f) return;
+            const r = new FileReader();
+            r.onload = e => {
+                const d = JSON.parse(e.target.result); drawnItems.clearLayers(); helperLayer.clearLayers();
+                d.features.forEach(item => {
+                    if(item.properties.type === 'circle') {
+                        createCircleLayer([item.geometry.coordinates[1], item.geometry.coordinates[0]], item.properties.radius, item.properties.color);
+                    } else if(item.properties.type === 'text') {
+                        createTextLayer([item.geometry.coordinates[1], item.geometry.coordinates[0]], item.properties.content, item.properties.color);
+                    } else {
+                        L.geoJSON(item, {
+                            style: { color: item.properties.color, weight:4 },
+                            onEachFeature: (f, l) => { attachContextMenu(l); drawnItems.addLayer(l); }
+                        });
+                    }
                 });
-            }, 1000);
+                showToast('Loaded');
+            };
+            r.readAsText(f); input.value='';
         }
 
-        function saveFile(content, name, type, isDataUrl = false) {
-            const link = document.createElement('a');
-            if (isDataUrl) link.href = content;
-            else {
-                const blob = new Blob([content], { type: type });
-                link.href = URL.createObjectURL(blob);
-            }
-            link.download = name;
-            link.click();
-        }
-
-        function clearMap() { if(confirm("Clear All?")) drawnItems.clearLayers(); }
-        function showToast(msg, err) {
-            const t = document.createElement('div');
-            t.className = 'toast';
-            t.style.borderLeft = err ? '4px solid #ef4444' : '4px solid #22c55e';
-            t.innerText = msg;
-            document.getElementById('toast-container').appendChild(t);
-            setTimeout(() => t.remove(), 3000);
-        }
+        function clearMap() { if(confirm("Clear?")) { drawnItems.clearLayers(); helperLayer.clearLayers(); } }
+        function showToast(m,e) { const t = document.createElement('div'); t.className='toast'; t.innerText=m; document.getElementById('toast-container').appendChild(t); setTimeout(()=>t.remove(),3000); }
     </script>
 </body>
 </html>
