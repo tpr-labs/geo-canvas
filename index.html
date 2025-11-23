@@ -3,18 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoCanvas v4 | Fixed & Enhanced</title>
-
+    <title>GeoCanvas v5 | Hybrid & Live</title>
+    
     <!-- External Libraries -->
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Leaflet Draw CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
-    <!-- Leaflet Geosearch CSS (Updated Version) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css" />
-    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -32,7 +27,7 @@
 
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; overflow: hidden; background: var(--bg); }
-
+        
         .app-container { display: flex; height: 100vh; width: 100vw; }
 
         /* --- Sidebar --- */
@@ -41,7 +36,7 @@
             background: var(--surface);
             border-right: 1px solid var(--border);
             display: flex; flex-direction: column;
-            z-index: 1001; /* Higher than map */
+            z-index: 1001;
             box-shadow: 4px 0 24px rgba(0,0,0,0.05);
         }
 
@@ -59,18 +54,28 @@
         .brand-text h1 { font-size: 18px; font-weight: 700; margin: 0; color: var(--text-main); }
         .brand-text p { font-size: 11px; margin: 0; color: var(--text-muted); }
 
-        /* --- Search Bar --- */
-        .search-container { display: flex; gap: 8px; }
+        /* --- Live Search Bar --- */
+        .search-wrapper { position: relative; display: flex; gap: 8px; }
         .search-input {
             flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
             font-size: 13px; outline: none; transition: border 0.2s;
         }
         .search-input:focus { border-color: var(--primary); }
-        .btn-search {
-            background: var(--primary); color: white; border: none; border-radius: 6px;
-            padding: 0 15px; cursor: pointer; transition: background 0.2s;
+        
+        /* Dropdown Results */
+        .search-results {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; border: 1px solid var(--border);
+            border-radius: 6px; margin-top: 4px;
+            max-height: 200px; overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none; z-index: 2000;
         }
-        .btn-search:hover { background: var(--primary-hover); }
+        .search-item {
+            padding: 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9;
+        }
+        .search-item:hover { background: #f8fafc; color: var(--primary); }
+        .search-item:last-child { border-bottom: none; }
 
         /* --- Content Area --- */
         .sidebar-content {
@@ -85,7 +90,7 @@
         }
         .tool-section h4::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-        /* --- Layer Switcher Grid --- */
+        /* --- Layer Grid --- */
         .layer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         .layer-btn {
             border: 1px solid var(--border); border-radius: 6px; padding: 8px;
@@ -96,14 +101,13 @@
             margin-bottom: 5px; filter: grayscale(100%);
         }
         .layer-btn span { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); }
-
         .layer-btn.active { border-color: var(--primary); background: #eff6ff; }
         .layer-btn.active img { filter: none; }
         .layer-btn.active span { color: var(--primary); }
 
         /* --- Controls --- */
         .control-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-
+        
         .btn {
             background: white; border: 1px solid var(--border); color: var(--text-main);
             padding: 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500;
@@ -113,12 +117,11 @@
         .btn:hover { background: #f1f5f9; }
         .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
         .btn.primary:hover { background: var(--primary-hover); }
-
         .btn.active {
             background: #eff6ff; border-color: var(--primary); color: var(--primary);
             box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
         }
-
+        
         input[type="number"] { width: 80px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
         input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: none; }
 
@@ -145,13 +148,12 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Custom Labels */
         .custom-label {
             background: rgba(255, 255, 255, 0.95); padding: 4px 8px; border-radius: 4px;
             border: 1px solid #333; font-weight: 600; font-size: 12px; white-space: nowrap;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-
+        
         /* Mobile */
         @media (max-width: 768px) {
             .app-container { flex-direction: column-reverse; }
@@ -168,34 +170,35 @@
                 <div class="app-brand">
                     <div class="brand-icon"><i class="fa-solid fa-map-location-dot"></i></div>
                     <div class="brand-text">
-                        <h1>GeoCanvas v4</h1>
+                        <h1>GeoCanvas v5</h1>
                         <p>Studio Edition</p>
                     </div>
                 </div>
-
-                <!-- Fixed Search Bar -->
-                <div class="search-container">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search City, Address...">
-                    <button class="btn-search" onclick="performSearch()"><i class="fa-solid fa-magnifying-glass"></i></button>
+                
+                <!-- Live Search Bar -->
+                <div class="search-wrapper">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search Bengaluru, India..." oninput="handleSearchInput(this.value)">
+                    <div id="searchResults" class="search-results"></div>
                 </div>
             </div>
 
             <div class="sidebar-content">
-
-                <!-- 1. Map Layers (Added) -->
+                
+                <!-- 1. Map Layers (Hybrid Added) -->
                 <div class="tool-section">
                     <h4>Map Layers</h4>
                     <div class="layer-grid">
                         <div class="layer-btn active" onclick="changeLayer('street', this)">
-                            <img src="https://a.tile.openstreetmap.org/12/2073/1409.png" alt="Street">
+                            <img src="https://a.tile.openstreetmap.org/12/2929/1898.png" alt="Street">
                             <span>Street</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('satellite', this)">
-                            <img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1409/2073" alt="Sat">
-                            <span>Satellite</span>
+                            <!-- Hybrid Icon Preview -->
+                            <img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1898/2929" alt="Sat">
+                            <span>Hybrid</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('dark', this)">
-                            <img src="https://a.basemaps.cartocdn.com/dark_all/12/2073/1409.png" alt="Dark">
+                            <img src="https://a.basemaps.cartocdn.com/dark_all/12/2929/1898.png" alt="Dark">
                             <span>Dark</span>
                         </div>
                     </div>
@@ -269,7 +272,6 @@
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-    <!-- Updated Geosearch Version -->
     <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -280,46 +282,108 @@
         let activeTool = null;
         let nativeDrawHandler = null;
         const layers = {};
+        let searchTimeout;
 
-        // --- 1. Init Map & Layers ---
+        // --- 1. Init Map (Bengaluru Default) ---
         function initMap() {
-            map = L.map('map', { zoomControl: false }).setView([40.7128, -74.0060], 13);
+            // Bengaluru Coordinates: 12.9716, 77.5946
+            map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
             L.control.zoom({ position: 'topright' }).addTo(map);
             L.control.scale({ metric: true, imperial: true, position: 'bottomright' }).addTo(map);
 
-            // Define Layers
+            // Layer: Street
             layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap', crossOrigin: true
             });
-
-            layers.satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            
+            // Layer: Hybrid (Satellite + Roads/Labels)
+            const satImg = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                 attribution: '© Esri', crossOrigin: true
             });
+            const satLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB', crossOrigin: true
+            });
+            layers.satellite = L.layerGroup([satImg, satLabels]);
 
+            // Layer: Dark
             layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 attribution: '© CartoDB', crossOrigin: true
             });
 
-            // Default
+            // Default Layer
             layers.street.addTo(map);
 
             // Feature Group
             drawnItems = new L.FeatureGroup();
             map.addLayer(drawnItems);
         }
-
+        
         initMap();
 
-        // --- 2. Tool Logic (Fixed) ---
+        // --- 2. Live Search Logic ---
+        async function handleSearchInput(query) {
+            const resultsContainer = document.getElementById('searchResults');
+            
+            // Clear previous timeout (debounce)
+            clearTimeout(searchTimeout);
 
+            if (!query || query.length < 3) {
+                resultsContainer.style.display = 'none';
+                return;
+            }
+
+            // Debounce: Wait 400ms after typing stops before searching
+            searchTimeout = setTimeout(async () => {
+                const provider = new window.GeoSearch.OpenStreetMapProvider();
+                try {
+                    const results = await provider.search({ query: query });
+                    displaySearchResults(results);
+                } catch (e) {
+                    console.error("Search error", e);
+                }
+            }, 400);
+        }
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            container.innerHTML = '';
+            
+            if (results.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            results.forEach(result => {
+                const item = document.createElement('div');
+                item.className = 'search-item';
+                item.innerText = result.label;
+                item.onclick = () => {
+                    // Fly to location
+                    map.setView([result.y, result.x], 13);
+                    // Add temp popup
+                    L.popup().setLatLng([result.y, result.x]).setContent(`<b>${result.label}</b>`).openOn(map);
+                    // Clear input and hide
+                    document.getElementById('searchInput').value = '';
+                    container.style.display = 'none';
+                };
+                container.appendChild(item);
+            });
+            container.style.display = 'block';
+        }
+
+        // Close dropdown if clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-wrapper')) {
+                document.getElementById('searchResults').style.display = 'none';
+            }
+        });
+
+        // --- 3. Tool Logic ---
         function activateTool(toolName) {
-            // 1. Reset everything first
             resetTools();
-
             activeTool = toolName;
             const color = document.getElementById('colorPicker').value;
 
-            // 2. Handle Leaflet Draw (Freehand)
             if (toolName === 'polyline' || toolName === 'polygon') {
                 if (toolName === 'polyline') {
                     nativeDrawHandler = new L.Draw.Polyline(map, { shapeOptions: { color: color, weight: 4 } });
@@ -328,9 +392,7 @@
                 }
                 nativeDrawHandler.enable();
                 updateUI(toolName === 'polyline' ? 'btnDrawLine' : 'btnDrawPoly');
-                showToast(`Draw ${toolName} active`);
             }
-            // 3. Handle Custom Click Tools
             else if (toolName === 'fixedCircle') {
                 updateUI('btnFixedCircle');
                 map.getContainer().style.cursor = 'copy';
@@ -349,9 +411,7 @@
                 nativeDrawHandler.disable();
                 nativeDrawHandler = null;
             }
-            // Reset UI buttons
             document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-            // Reset cursor
             map.getContainer().style.cursor = '';
         }
 
@@ -359,33 +419,47 @@
             if(activeId) document.getElementById(activeId).classList.add('active');
         }
 
-        // --- 3. Map Click Handler (Core Logic) ---
+        // --- 4. Map Click Handler (Circle Center Logic) ---
         map.on('click', function(e) {
             const color = document.getElementById('colorPicker').value;
 
             if (activeTool === 'fixedCircle') {
-                // Get KM, convert to Meters
                 const km = parseFloat(document.getElementById('radiusInput').value) || 5;
                 const radiusMeters = km * 1000;
 
+                // 1. Create the Main Circle
                 const circle = L.circle(e.latlng, {
                     color: color,
                     fillColor: color,
                     fillOpacity: 0.2,
                     radius: radiusMeters
                 });
-
-                // Add popup and metadata
-                circle.bindPopup(`<b>Radius:</b> ${km} km`).openPopup();
+                
+                // 2. Create the Center Point
+                const centerDot = L.circleMarker(e.latlng, {
+                    radius: 3,
+                    color: '#fff',
+                    weight: 1,
+                    fillColor: color,
+                    fillOpacity: 1
+                });
+                
+                const group = L.layerGroup([circle, centerDot]);
+                
+                // Add metadata to the Circle (for JSON export)
+                // We attach feature data to the circle layer, the dot is purely visual
                 circle.feature = {
                     type: 'Feature',
-                    properties: { type: 'circle', radius: radiusMeters, radiusKm: km, color: color }
+                    properties: { type: 'circle', radius: radiusMeters, radiusKm: km, color: color, hasCenter: true }
                 };
-
+                // We bind the group to drawnItems so they can be cleared together, 
+                // but for Leaflet Draw compatibility we add them individually
                 drawnItems.addLayer(circle);
+                drawnItems.addLayer(centerDot);
+
+                circle.bindPopup(`<b>Radius:</b> ${km} km`).openPopup();
             }
             else if (activeTool === 'text') {
-                // Use a short delay to prevent UI locking
                 setTimeout(() => {
                     const text = prompt("Enter Label Text:");
                     if (text) {
@@ -400,7 +474,7 @@
                             properties: { type: 'text', content: text, color: color }
                         };
                         drawnItems.addLayer(marker);
-                        resetTools(); // Exit text mode after placing
+                        resetTools();
                     }
                 }, 50);
             }
@@ -410,71 +484,27 @@
         map.on(L.Draw.Event.CREATED, function (e) {
             const layer = e.layer;
             const color = document.getElementById('colorPicker').value;
-
-            if (layer.setStyle) {
-                layer.setStyle({ color: color, fillColor: color });
-            }
-
+            if (layer.setStyle) layer.setStyle({ color: color, fillColor: color });
             layer.feature = layer.feature || { type: 'Feature', properties: {} };
             layer.feature.properties.color = color;
-
             drawnItems.addLayer(layer);
-            // Don't reset tool here to allow continuous drawing if desired,
-            // or uncomment next line to stop after one shape:
-            // resetTools();
-        });
-
-        // --- 4. Search Functionality (Fixed) ---
-        async function performSearch() {
-            const query = document.getElementById('searchInput').value;
-            if (!query) return;
-
-            showLoader(true);
-
-            // Check if GeoSearch is loaded
-            if (!window.GeoSearch || !window.GeoSearch.OpenStreetMapProvider) {
-                showToast('Search library not loaded', true);
-                showLoader(false);
-                return;
-            }
-
-            try {
-                const provider = new window.GeoSearch.OpenStreetMapProvider();
-                const results = await provider.search({ query: query });
-
-                if (results && results.length > 0) {
-                    const best = results[0];
-                    // GeoSearch 3.x uses { x: lng, y: lat }
-                    map.setView([best.y, best.x], 13);
-
-                    const popup = L.popup()
-                        .setLatLng([best.y, best.x])
-                        .setContent(`<b>${best.label}</b>`)
-                        .openOn(map);
-
-                    showToast('Location found');
-                } else {
-                    showToast('No results found', true);
-                }
-            } catch (err) {
-                console.error(err);
-                showToast('Search failed', true);
-            }
-            showLoader(false);
-        }
-
-        // Enter key for search
-        document.getElementById('searchInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') performSearch();
         });
 
         // --- 5. Layer Switching ---
         function changeLayer(type, btn) {
-            // Remove all
-            Object.values(layers).forEach(l => map.removeLayer(l));
-            // Add new
+            map.eachLayer((layer) => {
+                // Remove existing base layers only
+                if(layer !== drawnItems && layer !== map.zoomControl && !layer._url?.includes('tile.openstreetmap.org')) {
+                    // Safe removal logic depends on identifying tile layers
+                }
+            });
+            // Brute force: Remove all known layers, re-add
+            map.removeLayer(layers.street);
+            map.removeLayer(layers.satellite);
+            map.removeLayer(layers.dark);
+
             layers[type].addTo(map);
-            // UI
+
             document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         }
@@ -482,11 +512,13 @@
         // --- 6. Import/Export ---
         function downloadJSON() {
             const geojson = { type: "FeatureCollection", features: [] };
-
+            
             drawnItems.eachLayer(layer => {
                 let f;
+                // Ignore the center dots in JSON (they are recreated on load if needed)
+                if (layer instanceof L.CircleMarker && !(layer instanceof L.Circle)) return; 
+
                 if (layer instanceof L.Circle && layer.feature) {
-                    // Manual circle handling
                     f = {
                         type: "Feature",
                         properties: layer.feature.properties,
@@ -520,6 +552,13 @@
                                     fillColor: feature.properties.color
                                 });
                                 c.feature = feature;
+                                
+                                // Re-add center point if loading a circle
+                                const dot = L.circleMarker(latlng, {
+                                    radius: 3, color: '#fff', weight: 1, fillColor: feature.properties.color, fillOpacity: 1
+                                });
+                                drawnItems.addLayer(dot);
+                                
                                 return c;
                             }
                             if(feature.properties.type === 'text') {
@@ -535,6 +574,7 @@
                         },
                         style: (f) => ({ color: f.properties.color, fillColor: f.properties.color })
                     }).eachLayer(l => drawnItems.addLayer(l));
+                    
                     if(drawnItems.getLayers().length) map.fitBounds(drawnItems.getBounds());
                     showToast('Project Loaded');
                 } catch(err) { showToast('Invalid File', true); }
@@ -544,23 +584,22 @@
         }
 
         function exportImage() {
-            showLoader(true);
+            document.getElementById('loader').style.display = 'flex';
             const controls = document.querySelectorAll('.leaflet-control-container');
             controls.forEach(c => c.style.display = 'none');
             setTimeout(() => {
                 html2canvas(document.getElementById('map'), { useCORS: true, allowTaint: true }).then(canvas => {
                     saveFile(canvas.toDataURL(), 'map-image.png', 'image/png', true);
                     controls.forEach(c => c.style.display = 'block');
-                    showLoader(false);
+                    document.getElementById('loader').style.display = 'none';
                 });
             }, 1000);
         }
 
         function saveFile(content, name, type, isDataUrl = false) {
             const link = document.createElement('a');
-            if (isDataUrl) {
-                link.href = content;
-            } else {
+            if (isDataUrl) link.href = content;
+            else {
                 const blob = new Blob([content], { type: type });
                 link.href = URL.createObjectURL(blob);
             }
@@ -569,7 +608,6 @@
         }
 
         function clearMap() { if(confirm("Clear All?")) drawnItems.clearLayers(); }
-        function showLoader(v) { document.getElementById('loader').style.display = v ? 'flex' : 'none'; }
         function showToast(msg, err) {
             const t = document.createElement('div');
             t.className = 'toast';
