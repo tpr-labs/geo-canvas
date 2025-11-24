@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GeoCanvas | Version 0.1</title>
 
-    <!-- Browser Tab Icon (Favicon) -->
+    <!-- Browser Tab Icon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌍</text></svg>">
 
     <!-- Leaflet Core -->
@@ -16,10 +16,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 
+    <!-- Geometry Utils -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-geometryutil/0.10.2/leaflet.geometryutil.min.js"></script>
+
     <!-- Search & Utils -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css" />
     <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
-    <!-- html2canvas kept for future re-integration -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -34,6 +36,7 @@
             --text-main: #0f172a;
             --border: #e2e8f0;
             --danger: #ef4444;
+            --success: #22c55e;
             --sidebar-width: 360px;
         }
 
@@ -43,21 +46,25 @@
 
         /* --- Sidebar --- */
         .sidebar {
-            width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border);
+            width: var(--sidebar-width);
+            background: var(--surface);
+            border-right: 1px solid var(--border);
             display: flex; flex-direction: column; z-index: 1001; box-shadow: 4px 0 24px rgba(0,0,0,0.05);
-            transition: transform 0.3s;
+            transition: width 0.3s ease, padding 0.3s ease;
+            overflow: hidden; white-space: nowrap; flex-shrink: 0;
         }
-        .sidebar-header { padding: 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+        .sidebar.collapsed { width: 0; padding: 0; border-right: none; }
 
-        /* Branding */
+        .sidebar-header {
+            padding: 20px; background: var(--surface); border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+
         .app-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
         .brand-icon {
-            width: 36px; height: 36px;
-            background: linear-gradient(135deg, #2563eb, #1e40af);
-            color: white; border-radius: 10px;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px;
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+            width: 36px; height: 36px; background: linear-gradient(135deg, #2563eb, #1e40af);
+            color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            font-size: 18px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
         }
         .brand-text h1 { font-size: 20px; font-weight: 700; margin: 0; color: var(--text-main); letter-spacing: -0.5px; }
         .brand-text p { font-size: 11px; margin: 0; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -89,8 +96,23 @@
         .btn.active { background: #f3f4f6; border-color: var(--text-main); color: var(--text-main); font-weight: 700; }
         .btn.primary { background: var(--text-main); color: white; border-color: var(--text-main); }
         .btn.primary:hover { background: #333; }
+
         .btn-edit-mode { background: #fdf4ff; color: #a21caf; border-color: #f0abfc; }
-        .btn-edit-mode.active { background: #a21caf; color: white; border-color: #a21caf; }
+        .btn-edit-mode:hover { background: #fce7f3; }
+        .btn-edit-mode.active { background: #22c55e; color: white; border-color: #16a34a; }
+
+        .btn-icon-only { width: 32px; height: 32px; padding: 0; flex: 0 0 32px; border: none; background: transparent; color: #64748b; }
+        .btn-icon-only:hover { background: #f1f5f9; color: var(--text-main); }
+
+        .tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+        #sidebar-open-btn {
+            position: absolute; top: 20px; left: 20px; z-index: 1002;
+            background: white; border: 2px solid rgba(0,0,0,0.2); width: 40px; height: 40px; border-radius: 8px;
+            display: none; align-items: center; justify-content: center; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); color: var(--text-main); font-size: 16px; transition: transform 0.2s;
+        }
+        #sidebar-open-btn:hover { transform: scale(1.05); }
 
         input[type="number"] { width: 80px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; }
         input[type="color"] { border: none; width: 40px; height: 40px; cursor: pointer; background: none; }
@@ -108,16 +130,34 @@
         .map-wrapper { flex: 1; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
 
+        /* Capture Mode */
+        body.capture-mode .sidebar { display: none !important; }
+        body.capture-mode .map-wrapper { width: 100vw !important; height: 100vh !important; position: fixed; top:0; left:0; z-index: 9999; }
+        body.capture-mode #map { width: 100% !important; height: 100% !important; }
+        body.capture-mode .leaflet-control-container { display: none !important; }
+
         .custom-label {
             background: rgba(255, 255, 255, 0.95); padding: 4px 8px; border-radius: 4px;
             border: 1px solid #333; font-weight: 600; font-size: 12px; white-space: nowrap;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;
         }
 
-        .radius-label {
+        /* Measurement Labels */
+        .measure-label {
             background: transparent; border: none; box-shadow: none;
-            color: #000; font-weight: 800; font-size: 12px;
+            color: white; font-weight: 800; font-size: 11px;
+            text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+            white-space: nowrap;
+        }
+        .measure-label-area {
+            color: #facc15; font-size: 13px; text-shadow: -1px -1px 2px black, 1px 1px 2px black;
+        }
+        /* Radius label specifically for circles */
+        .radius-label-marker {
+            background: transparent; border: none; box-shadow: none;
+            color: #0f172a; font-weight: 800; font-size: 12px;
             text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+            white-space: nowrap;
         }
 
         /* Helpers */
@@ -171,19 +211,21 @@
 <body>
 
     <div class="app-container">
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebarPanel">
             <div class="sidebar-header">
                 <div class="app-brand">
                     <div class="brand-icon"><i class="fa-solid fa-map-location-dot"></i></div>
                     <div class="brand-text"><h1>GeoCanvas</h1><p>Version 0.1</p></div>
                 </div>
-                <div class="search-wrapper">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Search Bengaluru..." oninput="handleSearchInput(this.value)">
-                    <div id="searchResults" class="search-results"></div>
-                </div>
+                <button class="btn btn-icon-only" onclick="toggleSidebar()" title="Minimize Sidebar"><i class="fa-solid fa-chevron-left"></i></button>
             </div>
 
             <div class="sidebar-content">
+                <div class="search-wrapper" style="margin-bottom: 20px;">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Search Bengaluru..." oninput="handleSearchInput(this.value)">
+                    <div id="searchResults" class="search-results"></div>
+                </div>
+
                 <div class="tool-section">
                     <h4>Map Layers</h4>
                     <div class="layer-grid">
@@ -191,7 +233,6 @@
                             <img src="https://a.tile.openstreetmap.org/12/2929/1898.png"><span>Street</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('google', this)">
-                            <!-- GOOGLE HYBRID -->
                             <img src="https://mt1.google.com/vt/lyrs=y&x=2929&y=1898&z=12"><span>Google</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('dark', this)">
@@ -201,43 +242,48 @@
                 </div>
 
                 <div class="tool-section">
-                    <h4>Interaction Mode</h4>
+                    <h4>Edit Items</h4>
                     <button id="btnEditMode" class="btn btn-edit-mode" onclick="toggleEditMode()">
-                        <i class="fa-solid fa-lock"></i> <span>Unlock / Edit Layout</span>
+                        <i class="fa-solid fa-arrows-up-down-left-right"></i> <span>Enable Drag & Edit</span>
                     </button>
                     <div style="font-size:11px; color:#64748b; margin-top:5px;">
-                        Unlock to drag circles, text, and shapes.
+                        Enable to drag circles, move text, or modify shapes.
                     </div>
                 </div>
 
                 <div class="tool-section">
                     <h4>Style</h4>
                     <div class="control-row">
-                        <!-- Default Color set to Black -->
                         <input type="color" id="colorPicker" value="#000000">
                         <div style="font-size:11px; color:#64748b;"><strong>Color</strong><br>Right-click items to change</div>
                     </div>
                 </div>
 
-                <div class="tool-section" style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <h4 style="color: #0f172a; border:none; margin-bottom:5px;"><i class="fa-regular fa-circle-dot"></i> Fixed Circle</h4>
-                    <div class="control-row">
-                        <input type="number" id="radiusInput" value="5" min="0.1" step="0.1">
-                        <span style="font-size: 13px; font-weight: 600;">km</span>
-                        <button class="btn primary" id="btnFixedCircle" onclick="activateTool('fixedCircle')">Place</button>
-                    </div>
-                </div>
-
                 <div class="tool-section">
-                    <h4>Draw & Label</h4>
-                    <div class="control-row">
-                        <button class="btn" id="btnDrawLine" onclick="activateTool('polyline')"><i class="fa-solid fa-route"></i> Line</button>
-                        <button class="btn" id="btnDrawPoly" onclick="activateTool('polygon')"><i class="fa-solid fa-draw-polygon"></i> Area</button>
+                    <h4>Drawing Tools</h4>
+                    <div class="tool-grid">
+                        <button class="btn" id="btnFixedCircle" onclick="activateTool('fixedCircle')">
+                            <i class="fa-regular fa-circle-dot"></i> Circle (5km)
+                        </button>
+                        <button class="btn" id="btnDrawLine" onclick="activateTool('polyline')">
+                            <i class="fa-solid fa-route"></i> Line
+                        </button>
+                        <button class="btn" id="btnDrawPoly" onclick="activateTool('polygon')">
+                            <i class="fa-solid fa-draw-polygon"></i> Area
+                        </button>
+                        <button class="btn" id="btnTextTool" onclick="activateTool('text')">
+                            <i class="fa-solid fa-font"></i> Text
+                        </button>
                     </div>
-                    <button class="btn" id="btnTextTool" onclick="activateTool('text')" style="width:100%"><i class="fa-solid fa-font"></i> Text Label</button>
                 </div>
 
                 <div class="tool-section" style="margin-top:auto">
+                    <h4>History</h4>
+                    <div class="control-row">
+                        <button class="btn" onclick="undo()" title="Undo (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i> Undo</button>
+                        <button class="btn" onclick="redo()" title="Redo (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i> Redo</button>
+                    </div>
+
                     <h4>Share & Export</h4>
                     <button class="btn primary" onclick="generateShareLink()" style="width:100%; margin-bottom:10px; background:#7c3aed; border-color:#7c3aed;">
                         <i class="fa-solid fa-link"></i> Share / Save Link
@@ -247,16 +293,13 @@
                         <button class="btn" onclick="document.getElementById('fileInput').click()">Load JSON</button>
                         <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(this)">
                     </div>
-
-                    <!-- Download Button Removed per request -->
-                    <!-- <button class="btn primary" onclick="exportImage()" style="width:100%"><i class="fa-solid fa-image"></i> Download Image</button> -->
-
                     <button class="btn" onclick="clearMap()" style="width:100%; margin-top:10px; color: var(--danger); border-color: #fee2e2;">Clear All</button>
                 </div>
             </div>
         </aside>
 
         <div class="map-wrapper">
+            <button id="sidebar-open-btn" onclick="toggleSidebar()" title="Show Sidebar"><i class="fa-solid fa-bars"></i></button>
             <div id="map"></div>
             <div id="draw-helper">Snapping Active. Click last point again to finish.</div>
 
@@ -303,9 +346,13 @@
         let ctxTargetLayer = null;
         let editHandler = null;
         let isEditMode = false;
-        let snapMarker = null;
-        let snapTarget = null;
+        let snapMarker = null, snapTarget = null;
+        let resizeTimer;
         const layers = {};
+
+        let historyStack = [];
+        let redoStack = [];
+        let isUndoingRedoing = false;
 
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
@@ -313,39 +360,162 @@
             L.control.scale({ metric: true, imperial: true, position: 'bottomright' }).addTo(map);
 
             layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', crossOrigin: true });
-
-            layers.google = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', {
-                maxZoom: 20,
-                subdomains: ['mt0','mt1','mt2','mt3'],
-                attribution: '© Google',
-                crossOrigin: 'anonymous'
-            });
-
+            layers.google = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'], attribution: '© Google', crossOrigin: 'anonymous' });
             layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', crossOrigin: true });
 
             layers.street.addTo(map);
 
             drawnItems = new L.FeatureGroup();
             map.addLayer(drawnItems);
-
             helperLayer = new L.LayerGroup();
             map.addLayer(helperLayer);
 
-            editHandler = new L.EditToolbar.Edit(map, {
-                featureGroup: drawnItems,
-                selectedPathOptions: { maintainColor: true, opacity: 0.8, weight: 4 }
-            });
+            editHandler = new L.EditToolbar.Edit(map, { featureGroup: drawnItems, selectedPathOptions: { maintainColor: true, opacity: 0.8, weight: 4 } });
 
             map.on('click', closeContextMenu);
             map.on('movestart', closeContextMenu);
             map.on('mousemove', handleSnapMove);
 
+            // Creation
+            map.on(L.Draw.Event.CREATED, (e) => {
+                const l = e.layer; const c = document.getElementById('colorPicker').value;
+                if(l.setStyle) l.setStyle({ color:c, fillColor:c, weight: 4 });
+                l.feature = { type:'Feature', properties:{ color:c } };
+
+                attachContextMenu(l);
+                drawnItems.addLayer(l);
+
+                if(l instanceof L.Polyline || l instanceof L.Polygon) updateMeasurements(l);
+
+                if(isEditMode) { editHandler.removeHooks(); editHandler.addHooks(); enableLiveEditHooks(); }
+                resetTools();
+                saveState();
+            });
+
+            // Edit Events
+            map.on('draw:editresize', function(e) {
+                updateCircleHelpers(e.layer);
+                updateMeasurements(e.layer);
+                clearTimeout(resizeTimer); resizeTimer = setTimeout(saveState, 500);
+            });
+            map.on('draw:editmove', function(e) {
+                updateCircleHelpers(e.layer);
+                updateMeasurements(e.layer);
+            });
+            map.on(L.Draw.Event.EDITED, saveState);
+            map.on(L.Draw.Event.DELETED, saveState);
+
+            saveState();
             setTimeout(checkForShareData, 500);
         }
         initMap();
 
-        // --- Shareable URL ---
-        function generateShareLink() {
+        // --- Live Update Hooks ---
+        function enableLiveEditHooks() {
+            drawnItems.eachLayer(layer => {
+                if ((layer instanceof L.Polygon || layer instanceof L.Polyline) && layer.editing && layer.editing.enabled()) {
+                    const markers = layer.editing._markers;
+                    if (markers) {
+                        markers.forEach(marker => {
+                            if (!marker._hasLiveUpdate) {
+                                marker.on('drag', () => updateMeasurements(layer));
+                                marker._hasLiveUpdate = true;
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        // --- Measurement Logic ---
+        function updateMeasurements(layer) {
+            if(layer.measurementLabels) {
+                layer.measurementLabels.forEach(label => helperLayer.removeLayer(label));
+            }
+            layer.measurementLabels = [];
+
+            if (layer instanceof L.Polygon) {
+                // Area
+                const area = L.GeometryUtil.geodesicArea(layer.getLatLngs()[0]);
+                const areaStr = (area / 1000000).toFixed(2) + " km²";
+                const center = layer.getBounds().getCenter();
+
+                const areaLabel = L.marker(center, {
+                    icon: L.divIcon({ className: 'measure-label measure-label-area', html: areaStr, iconSize: [100, 20], iconAnchor: [50, 10] }),
+                    interactive: false
+                });
+                helperLayer.addLayer(areaLabel);
+                layer.measurementLabels.push(areaLabel);
+
+                // Edges
+                const latlngs = layer.getLatLngs()[0];
+                for (let i = 0; i < latlngs.length; i++) {
+                    const p1 = latlngs[i];
+                    const p2 = latlngs[(i + 1) % latlngs.length];
+                    const dist = map.distance(p1, p2);
+                    const distStr = (dist / 1000).toFixed(2) + " km";
+                    const midLat = (p1.lat + p2.lat) / 2;
+                    const midLng = (p1.lng + p2.lng) / 2;
+
+                    const edgeLabel = L.marker([midLat, midLng], {
+                        icon: L.divIcon({ className: 'measure-label', html: distStr, iconSize: [100, 20], iconAnchor: [50, 10] }),
+                        interactive: false
+                    });
+                    helperLayer.addLayer(edgeLabel);
+                    layer.measurementLabels.push(edgeLabel);
+                }
+            }
+            else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+                let totalDist = 0;
+                const latlngs = layer.getLatLngs();
+                for (let i = 0; i < latlngs.length - 1; i++) {
+                    totalDist += map.distance(latlngs[i], latlngs[i+1]);
+                }
+                const distStr = (totalDist / 1000).toFixed(2) + " km";
+                const center = layer.getBounds().getCenter();
+                const lineLabel = L.marker(center, {
+                    icon: L.divIcon({ className: 'measure-label measure-label-area', html: distStr, iconSize: [100, 20], iconAnchor: [50, 10] }),
+                    interactive: false
+                });
+                helperLayer.addLayer(lineLabel);
+                layer.measurementLabels.push(lineLabel);
+            }
+        }
+
+        // --- History ---
+        function saveState() {
+            if(isUndoingRedoing) return;
+            const state = getMapState();
+            const lastState = historyStack[historyStack.length - 1];
+            if(JSON.stringify(state) !== JSON.stringify(lastState)) {
+                historyStack.push(state);
+                if(historyStack.length > 50) historyStack.shift();
+                redoStack = [];
+            }
+        }
+
+        function undo() {
+            if(historyStack.length <= 1) return;
+            isUndoingRedoing = true;
+            const current = historyStack.pop();
+            redoStack.push(current);
+            const prev = historyStack[historyStack.length - 1];
+            applyMapState(prev);
+            isUndoingRedoing = false;
+            showToast('Undo');
+        }
+
+        function redo() {
+            if(redoStack.length === 0) return;
+            isUndoingRedoing = true;
+            const next = redoStack.pop();
+            historyStack.push(next);
+            applyMapState(next);
+            isUndoingRedoing = false;
+            showToast('Redo');
+        }
+
+        function getMapState() {
             const features = [];
             drawnItems.eachLayer(layer => {
                 let type = 'unknown';
@@ -364,57 +534,46 @@
                 }
                 features.push({ type, data });
             });
-            const state = { c: [map.getCenter().lat, map.getCenter().lng], z: map.getZoom(), d: features };
-            const json = JSON.stringify(state);
-            const encoded = btoa(unescape(encodeURIComponent(json)));
-            const url = window.location.origin + window.location.pathname + '?map=' + encoded;
-            document.getElementById('share-url-box').innerText = url;
-            document.getElementById('share-modal').style.display = 'flex';
+            return features;
         }
 
-        function copyShareLink() {
-            const text = document.getElementById('share-url-box').innerText;
-            navigator.clipboard.writeText(text).then(() => showToast('Link copied!'));
-        }
-
-        function checkForShareData() {
-            const params = new URLSearchParams(window.location.search);
-            const mapData = params.get('map');
-            if (mapData) {
-                try {
-                    const json = decodeURIComponent(escape(atob(mapData)));
-                    const state = JSON.parse(json);
-                    if(state.c && state.z) map.setView(state.c, state.z);
-                    if(state.d && Array.isArray(state.d)) state.d.forEach(item => restoreItem(item));
-                    showToast('Map restored from link');
-                } catch (e) { console.error("Share load error:", e); showToast('Invalid Share Link', true); }
+        function applyMapState(features) {
+            drawnItems.clearLayers();
+            helperLayer.clearLayers();
+            features.forEach(item => restoreItem(item));
+            if(isEditMode) {
+                editHandler.removeHooks();
+                editHandler.addHooks();
+                enableLiveEditHooks();
+                drawnItems.eachLayer(l => { if(l instanceof L.Marker && l.dragging) l.dragging.enable(); });
             }
         }
 
-        function restoreItem(item) {
-            if (!item.type || !item.data) return;
-            const d = item.data;
-
-            // FIX: Ensure color is extracted correctly from either top-level (custom items) or properties (GeoJSON)
-            let color = d.color;
-            if (!color && d.properties && d.properties.color) {
-                color = d.properties.color;
+        document.addEventListener('keydown', function(e) {
+            if(e.target.tagName === 'INPUT') return;
+            if((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if(e.shiftKey) redo(); else undo();
             }
-            color = color || '#000000';
-
-            if (item.type === 'circle') {
-                createCircleLayer([d.lat, d.lng], d.radius, color);
-            } else if (item.type === 'text') {
-                createTextLayer([d.lat, d.lng], d.content, color);
-            } else if (item.type === 'geojson') {
-                L.geoJSON(d, {
-                    style: { color: color, weight: 4, opacity: 1 },
-                    onEachFeature: (f, l) => { l.options.color = color; attachContextMenu(l); drawnItems.addLayer(l); }
-                });
+            if((e.ctrlKey || e.metaKey) && e.key === 'y') {
+                e.preventDefault(); redo();
             }
+        });
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebarPanel');
+            const openBtn = document.getElementById('sidebar-open-btn');
+            if(sidebar.classList.contains('collapsed')) {
+                sidebar.classList.remove('collapsed');
+                openBtn.style.display = 'none';
+            } else {
+                sidebar.classList.add('collapsed');
+                setTimeout(() => { openBtn.style.display = 'flex'; }, 300);
+            }
+            setTimeout(() => { map.invalidateSize(); }, 300);
         }
 
-        // --- Helper Generators ---
+        // --- Helpers ---
         function getDestinationPoint(latlng, heading, distance) {
             const R = 6378137; const rad = Math.PI / 180;
             const lat1 = latlng.lat * rad; const lon1 = latlng.lng * rad;
@@ -429,12 +588,37 @@
             const dot = L.circleMarker(latlng, { radius: 3, color: '#fff', weight: 1, fillColor: color, fillOpacity: 1, interactive: false });
             const rim = getDestinationPoint(L.latLng(latlng), 90, radius);
             const line = L.polyline([latlng, rim], { color: color, weight: 2, dashArray: '5, 5', interactive: false });
+
             const km = (radius / 1000).toFixed(2) + ' km';
-            line.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
-            circle.centerDot = dot; circle.radiusLine = line;
+
+            // Use a label marker instead of binding a tooltip to the line
+            // This ensures we can update the text + position reliably in Leaflet 1.x
+            const midPoint = L.latLng(
+                (latlng.lat + rim.lat) / 2,
+                (latlng.lng + rim.lng) / 2
+            );
+            const label = L.marker(midPoint, {
+                icon: L.divIcon({
+                    className: 'radius-label-marker',
+                    html: km,
+                    iconSize: [60, 20],
+                    iconAnchor: [30, 10]
+                }),
+                interactive: false
+            });
+
+            circle.centerDot = dot;
+            circle.radiusLine = line;
+            circle.radiusLabel = label; // Store ref
+
             circle.feature = { type: 'Feature', properties: { type: 'circle', radius: radius, color: color } };
+
             attachContextMenu(circle);
-            drawnItems.addLayer(circle); helperLayer.addLayer(dot); helperLayer.addLayer(line);
+            drawnItems.addLayer(circle);
+            helperLayer.addLayer(dot);
+            helperLayer.addLayer(line);
+            helperLayer.addLayer(label);
+
             return circle;
         }
 
@@ -446,17 +630,32 @@
         }
 
         function updateCircleHelpers(circle) {
-            if (!circle.centerDot || !circle.radiusLine) return;
-            const center = circle.getLatLng(); const radius = circle.getRadius();
+            if (!circle.centerDot || !circle.radiusLine || !circle.radiusLabel) return;
+            const center = circle.getLatLng();
+            const radius = circle.getRadius();
+
+            // 1. Move Center Dot
             circle.centerDot.setLatLng(center);
+
+            // 2. Move Radius Line
             const rim = getDestinationPoint(center, 90, radius);
             circle.radiusLine.setLatLngs([center, rim]);
+
+            // 3. Move & Update Label
+            const midPoint = L.latLng(
+                (center.lat + rim.lat) / 2,
+                (center.lng + rim.lng) / 2
+            );
+            circle.radiusLabel.setLatLng(midPoint);
             const km = (radius / 1000).toFixed(2) + ' km';
-            if(circle.radiusLine.getTooltip()) circle.radiusLine.setTooltipContent(km);
-            else circle.radiusLine.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
+
+            // Efficiently update label text
+            const icon = circle.radiusLabel.options.icon;
+            icon.options.html = km;
+            circle.radiusLabel.setIcon(icon);
         }
 
-        // --- Tools ---
+        // --- Tool Logic ---
         function activateTool(toolName) {
             resetTools();
             activeTool = toolName;
@@ -464,12 +663,17 @@
             if (toolName === 'polyline' || toolName === 'polygon') {
                 document.getElementById('draw-helper').style.display = 'block';
                 const handler = (toolName === 'polyline') ? L.Draw.Polyline : L.Draw.Polygon;
-                nativeDrawHandler = new handler(map, { shapeOptions: { color: color, weight: 4, opacity: 1 }, allowIntersection: false });
+                nativeDrawHandler = new handler(map, {
+                    shapeOptions: { color: color, weight: 4, opacity: 1 },
+                    allowIntersection: false,
+                    showLength: true,
+                    metric: true
+                });
                 nativeDrawHandler.enable();
             } else if (toolName === 'fixedCircle') {
                 document.getElementById('btnFixedCircle').classList.add('active');
                 map.getContainer().style.cursor = 'copy';
-                showToast('Click map to place circle');
+                showToast('Click center point on map');
             } else if (toolName === 'text') {
                 document.getElementById('btnTextTool').classList.add('active');
                 map.getContainer().style.cursor = 'text';
@@ -509,38 +713,34 @@
         map.on('click', function(e) {
             const color = document.getElementById('colorPicker').value;
             if (activeTool === 'fixedCircle') {
-                const km = parseFloat(document.getElementById('radiusInput').value) || 5;
+                const km = 5;
                 createCircleLayer(e.latlng, km * 1000, color);
+                saveState();
+                if(!isEditMode) toggleEditMode();
+                resetTools();
             } else if (activeTool === 'text') {
                 setTimeout(() => {
                     const text = prompt("Enter Text:");
-                    if (text) { createTextLayer(e.latlng, text, color); resetTools(); }
+                    if (text) { createTextLayer(e.latlng, text, color); resetTools(); saveState(); }
                 }, 50);
             }
         });
 
-        map.on(L.Draw.Event.CREATED, function (e) {
-            const l = e.layer; const c = document.getElementById('colorPicker').value;
-            if(l.setStyle) l.setStyle({ color:c, fillColor:c, weight: 4 });
-            l.feature = { type:'Feature', properties:{ color:c } };
-            attachContextMenu(l); drawnItems.addLayer(l);
-            if(isEditMode) { editHandler.removeHooks(); editHandler.addHooks(); }
-            resetTools();
-        });
-
         // --- Edit Mode ---
-        function toggleEditMode() {
+        function toggleEditMode(forceOn = false) {
+            if(forceOn && isEditMode) return;
             isEditMode = !isEditMode;
             const btn = document.getElementById('btnEditMode');
             if (isEditMode) {
                 btn.classList.add('active');
-                btn.innerHTML = '<i class="fa-solid fa-lock-open"></i> <span>Editing Unlocked</span>';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Editing Active</span>';
                 editHandler.enable();
+                enableLiveEditHooks(); // Bind live updates for Polys
                 drawnItems.eachLayer(l => { if(l instanceof L.Marker && l.dragging) l.dragging.enable(); });
-                showToast("Drag items to move");
+                showToast("You can now drag & resize items");
             } else {
                 btn.classList.remove('active');
-                btn.innerHTML = '<i class="fa-solid fa-lock"></i> <span>Unlock / Edit Layout</span>';
+                btn.innerHTML = '<i class="fa-solid fa-arrows-up-down-left-right"></i> <span>Enable Drag & Edit</span>';
                 editHandler.disable();
                 drawnItems.eachLayer(l => { if(l instanceof L.Marker && l.dragging) l.dragging.disable(); });
                 editHandler.save();
@@ -549,10 +749,22 @@
 
         function attachContextMenu(layer) {
             layer.on('contextmenu', e => { L.DomEvent.stopPropagation(e); openContextMenu(e, layer); });
+
             if (layer instanceof L.Circle) {
                 layer.on('move', () => updateCircleHelpers(layer));
                 layer.on('drag', () => updateCircleHelpers(layer));
                 layer.on('edit', () => updateCircleHelpers(layer));
+
+                layer.on('dragend', saveState);
+                layer.on('moveend', saveState);
+            }
+            if(layer instanceof L.Marker) {
+                layer.on('dragend', saveState);
+            }
+            if (layer instanceof L.Polyline || layer instanceof L.Polygon) {
+                layer.on('edit', () => updateMeasurements(layer));
+                layer.on('dragend', saveState);
+                layer.on('edit', saveState);
             }
         }
 
@@ -600,78 +812,94 @@
                 if(ctxTargetLayer.feature) ctxTargetLayer.feature.properties.color = color;
             }
             closeContextMenu();
+            saveState();
         }
 
         function deleteContextLayer() {
             if (ctxTargetLayer) {
                 if(ctxTargetLayer.centerDot) helperLayer.removeLayer(ctxTargetLayer.centerDot);
                 if(ctxTargetLayer.radiusLine) helperLayer.removeLayer(ctxTargetLayer.radiusLine);
+                if(ctxTargetLayer.radiusLabel) helperLayer.removeLayer(ctxTargetLayer.radiusLabel);
+                if(ctxTargetLayer.measurementLabels) ctxTargetLayer.measurementLabels.forEach(l => helperLayer.removeLayer(l));
                 drawnItems.removeLayer(ctxTargetLayer);
                 closeContextMenu();
+                saveState();
             }
         }
 
-        // --- IO ---
-        async function handleSearchInput(q) {
-            clearTimeout(searchTimeout);
-            const el = document.getElementById('searchResults');
-            if(!q || q.length<3) { el.style.display='none'; return; }
-            searchTimeout = setTimeout(async () => {
-                const res = await new window.GeoSearch.OpenStreetMapProvider().search({ query:q });
-                el.innerHTML = '';
-                if(res.length) {
-                    res.forEach(r => {
-                        const d = document.createElement('div'); d.className='search-item'; d.innerText=r.label;
-                        d.onclick = () => { map.setView([r.y, r.x], 13); el.style.display='none'; };
-                        el.appendChild(d);
-                    });
-                    el.style.display='block';
-                } else el.style.display='none';
-            }, 400);
+        // --- Share Logic ---
+        function generateShareLink() {
+            const state = { c: [map.getCenter().lat, map.getCenter().lng], z: map.getZoom(), d: getMapState() };
+            const json = JSON.stringify(state);
+            const encoded = btoa(unescape(encodeURIComponent(json)));
+            const url = window.location.origin + window.location.pathname + '?map=' + encoded;
+            document.getElementById('share-url-box').innerText = url;
+            document.getElementById('share-modal').style.display = 'flex';
         }
 
-        function changeLayer(t, btn) {
-            map.eachLayer(l => { if(l!==drawnItems && l!==helperLayer && l!==map.zoomControl && !l._url?.includes('tile.openstreetmap')) {} });
-            map.removeLayer(layers.street); map.removeLayer(layers.google); map.removeLayer(layers.dark);
-            layers[t].addTo(map);
-            document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+        function copyShareLink() {
+            const text = document.getElementById('share-url-box').innerText;
+            navigator.clipboard.writeText(text).then(() => showToast('Link copied!'));
         }
 
-        // --- EXPORT FUNCTION DEFERRED ---
-        /* function exportImage() { ... }
-        */
-
-        function downloadJSON() {
-            const gj = { type:"FeatureCollection", features:[] };
-            drawnItems.eachLayer(l => {
-                if(l.toGeoJSON) {
-                    const f = l.toGeoJSON();
-                    if(l instanceof L.Circle) f.geometry = { type:"Point", coordinates:[l.getLatLng().lng, l.getLatLng().lat] };
-                    f.properties = l.feature ? l.feature.properties : {};
-                    gj.features.push(f);
-                }
-            });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([JSON.stringify(gj)], {type:'application/json'}));
-            a.download = `map-${Date.now()}.json`; a.click();
+        function checkForShareData() {
+            const params = new URLSearchParams(window.location.search);
+            const mapData = params.get('map');
+            if (mapData) {
+                try {
+                    const json = decodeURIComponent(escape(atob(mapData)));
+                    const state = JSON.parse(json);
+                    if(state.c && state.z) map.setView(state.c, state.z);
+                    if(state.d && Array.isArray(state.d)) applyMapState(state.d);
+                    showToast('Map restored from link');
+                } catch (e) { console.error("Share load error:", e); showToast('Invalid Share Link', true); }
+            }
         }
 
-        function loadJSON(input) {
-            const f = input.files[0]; if(!f) return;
-            const r = new FileReader();
-            r.onload = e => {
-                const d = JSON.parse(e.target.result); drawnItems.clearLayers(); helperLayer.clearLayers();
-                d.features.forEach(item => {
-                    restoreItem({ type: item.properties.type || 'geojson', data: item });
+        function restoreItem(item) {
+            if (!item.type || !item.data) return;
+            const d = item.data;
+            let color = d.color || (d.properties ? d.properties.color : '#000000');
+            if (item.type === 'circle') createCircleLayer([d.lat, d.lng], d.radius, color);
+            else if (item.type === 'text') createTextLayer([d.lat, d.lng], d.content, color);
+            else if (item.type === 'geojson') {
+                L.geoJSON(d, {
+                    style: { color: color, weight: 4, opacity: 1 },
+                    onEachFeature: (f, l) => {
+                        l.options.color = color;
+                        attachContextMenu(l);
+                        drawnItems.addLayer(l);
+                        if(l instanceof L.Polyline || l instanceof L.Polygon) updateMeasurements(l);
+                    }
                 });
-                showToast('Loaded');
-            };
-            r.readAsText(f); input.value='';
+            }
         }
 
-        function clearMap() { if(confirm("Clear?")) { drawnItems.clearLayers(); helperLayer.clearLayers(); } }
-        function showToast(m,e) { const t = document.createElement('div'); t.className='toast'; t.innerText=m; document.getElementById('toast-container').appendChild(t); setTimeout(()=>t.remove(),3000); }
+        // --- Fixed Export (Snapshot Mode) ---
+        function exportImage() {
+            document.getElementById('loader').style.display='flex';
+            document.body.classList.add('capture-mode');
+            map.invalidateSize();
+            setTimeout(() => {
+                const mapEl = document.getElementById('map');
+                html2canvas(mapEl, {
+                    useCORS: true, allowTaint: false,
+                    width: window.innerWidth, height: window.innerHeight,
+                    scrollX: 0, scrollY: 0, x: 0, y: 0, scale: window.devicePixelRatio
+                }).then(c => {
+                    const a = document.createElement('a');
+                    a.href = c.toDataURL('image/png'); a.download='map-export.png'; a.click();
+                    document.body.classList.remove('capture-mode');
+                    map.invalidateSize();
+                    document.getElementById('loader').style.display='none';
+                }).catch(e => {
+                    console.error(e); alert('Export failed.');
+                    document.body.classList.remove('capture-mode');
+                    map.invalidateSize();
+                    document.getElementById('loader').style.display='none';
+                });
+            }, 1000);
+        }
     </script>
 </body>
 </html>
