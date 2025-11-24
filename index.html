@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GeoCanvas v11 | Shareable Maps</title>
-    
+    <title>GeoCanvas | Version 0.1</title>
+
+    <!-- Browser Tab Icon (Favicon) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌍</text></svg>">
+
     <!-- Leaflet Core -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -16,14 +19,16 @@
     <!-- Search & Utils -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-geosearch@3.8.0/dist/geosearch.css" />
     <script src="https://unpkg.com/leaflet-geosearch@3.8.0/dist/bundle.min.js"></script>
+    <!-- html2canvas kept for future re-integration -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --primary: #2563eb;
+            --primary: #000000;
+            --accent: #2563eb;
             --surface: #ffffff;
             --bg: #f8fafc;
             --text-main: #0f172a;
@@ -33,28 +38,42 @@
         }
 
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Inter', sans-serif; overflow: hidden; background: var(--bg); }
-        .app-container { display: flex; height: 100vh; width: 100vw; }
+        .app-container { display: flex; height: 100vh; width: 100vw; transition: all 0.3s; }
         * { box-sizing: border-box; }
 
         /* --- Sidebar --- */
         .sidebar {
             width: var(--sidebar-width); background: var(--surface); border-right: 1px solid var(--border);
             display: flex; flex-direction: column; z-index: 1001; box-shadow: 4px 0 24px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
         }
         .sidebar-header { padding: 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
-        .app-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
-        .brand-icon { width: 32px; height: 32px; background: var(--primary); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-        .brand-text h1 { font-size: 18px; font-weight: 700; margin: 0; }
-        
+
+        /* Branding */
+        .app-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 15px; }
+        .brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            color: white; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+        }
+        .brand-text h1 { font-size: 20px; font-weight: 700; margin: 0; color: var(--text-main); letter-spacing: -0.5px; }
+        .brand-text p { font-size: 11px; margin: 0; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
         .search-wrapper { position: relative; display: flex; gap: 8px; }
-        .search-input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px; outline: none; }
+        .search-input { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px; outline: none; font-size: 13px; transition: border 0.2s; }
+        .search-input:focus { border-color: var(--accent); }
+
         .search-results {
-            position: absolute; top: 100%; left: 0; right: 0; background: white; 
+            position: absolute; top: 100%; left: 0; right: 0; background: white;
             border: 1px solid var(--border); border-radius: 6px; margin-top: 4px;
             max-height: 200px; overflow-y: auto; display: none; z-index: 2000;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
         }
         .search-item { padding: 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
-        .search-item:hover { background: #f8fafc; color: var(--primary); }
+        .search-item:hover { background: #f8fafc; color: var(--accent); }
 
         .sidebar-content { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 24px; }
         .tool-section h4 { font-size: 11px; text-transform: uppercase; color: #64748b; margin: 0 0 10px 0; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
@@ -62,14 +81,14 @@
         /* --- Controls --- */
         .control-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
         .btn {
-            background: white; border: 1px solid var(--border); color: var(--text-main); padding: 10px; 
-            border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: flex; 
+            background: white; border: 1px solid var(--border); color: var(--text-main); padding: 10px;
+            border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: flex;
             align-items: center; justify-content: center; gap: 8px; flex: 1; transition: all 0.2s;
         }
         .btn:hover { background: #f1f5f9; }
-        .btn.active { background: #eff6ff; border-color: var(--primary); color: var(--primary); }
-        .btn.primary { background: var(--primary); color: white; border-color: var(--primary); }
-        .btn.primary:hover { background: #1d4ed8; }
+        .btn.active { background: #f3f4f6; border-color: var(--text-main); color: var(--text-main); font-weight: 700; }
+        .btn.primary { background: var(--text-main); color: white; border-color: var(--text-main); }
+        .btn.primary:hover { background: #333; }
         .btn-edit-mode { background: #fdf4ff; color: #a21caf; border-color: #f0abfc; }
         .btn-edit-mode.active { background: #a21caf; color: white; border-color: #a21caf; }
 
@@ -79,28 +98,29 @@
         /* --- Layer Grid --- */
         .layer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
         .layer-btn { border: 1px solid var(--border); border-radius: 6px; padding: 8px; text-align: center; cursor: pointer; background: white; }
-        .layer-btn img { width: 100%; height: 40px; object-fit: cover; border-radius: 4px; filter: grayscale(100%); }
-        .layer-btn.active { border-color: var(--primary); background: #eff6ff; }
+        .layer-btn img { width: 100%; height: 40px; object-fit: cover; border-radius: 4px; filter: grayscale(100%); transition: 0.2s; }
+        .layer-btn:hover img { filter: grayscale(0%); }
+        .layer-btn.active { border-color: var(--text-main); background: #f3f4f6; }
         .layer-btn.active img { filter: none; }
         .layer-btn span { display: block; font-size: 11px; font-weight: 600; margin-top: 5px; }
 
         /* --- Map & Overlays --- */
         .map-wrapper { flex: 1; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
-        
+
         .custom-label {
             background: rgba(255, 255, 255, 0.95); padding: 4px 8px; border-radius: 4px;
             border: 1px solid #333; font-weight: 600; font-size: 12px; white-space: nowrap;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer;
         }
-        
-        /* Radius Label Tooltip Style */
+
         .radius-label {
             background: transparent; border: none; box-shadow: none;
-            color: #333; font-weight: 800; font-size: 12px;
+            color: #000; font-weight: 800; font-size: 12px;
             text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
         }
 
+        /* Helpers */
         #context-menu {
             position: absolute; display: none; background: white; border: 1px solid var(--border);
             border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); width: 220px; z-index: 3000;
@@ -117,7 +137,6 @@
             font-size: 12px; z-index: 2000; display: none; pointer-events: none;
         }
 
-        /* Share Modal */
         #share-modal {
             display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 4000;
             align-items: center; justify-content: center;
@@ -143,7 +162,7 @@
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-top: 10px; font-size: 13px; animation: slideUp 0.3s ease; display: flex; align-items: center; gap: 10px; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .loader { position: fixed; inset: 0; background: rgba(255,255,255,0.8); z-index: 3000; display: none; align-items: center; justify-content: center; flex-direction: column; }
-        .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: var(--text-main); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         @media (max-width: 768px) { .app-container { flex-direction: column-reverse; } .sidebar { width: 100%; height: 50%; } }
@@ -155,8 +174,8 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="app-brand">
-                    <div class="brand-icon"><i class="fa-solid fa-share-nodes"></i></div>
-                    <div class="brand-text"><h1>GeoCanvas v11</h1><p>Share & Collaborate</p></div>
+                    <div class="brand-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+                    <div class="brand-text"><h1>GeoCanvas</h1><p>Version 0.1</p></div>
                 </div>
                 <div class="search-wrapper">
                     <input type="text" id="searchInput" class="search-input" placeholder="Search Bengaluru..." oninput="handleSearchInput(this.value)">
@@ -172,7 +191,8 @@
                             <img src="https://a.tile.openstreetmap.org/12/2929/1898.png"><span>Street</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('google', this)">
-                            <img src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/12/1898/2929"><span>Hybrid</span>
+                            <!-- GOOGLE HYBRID -->
+                            <img src="https://mt1.google.com/vt/lyrs=y&x=2929&y=1898&z=12"><span>Google</span>
                         </div>
                         <div class="layer-btn" onclick="changeLayer('dark', this)">
                             <img src="https://a.basemaps.cartocdn.com/dark_all/12/2929/1898.png"><span>Dark</span>
@@ -193,13 +213,14 @@
                 <div class="tool-section">
                     <h4>Style</h4>
                     <div class="control-row">
-                        <input type="color" id="colorPicker" value="#2563eb">
+                        <!-- Default Color set to Black -->
+                        <input type="color" id="colorPicker" value="#000000">
                         <div style="font-size:11px; color:#64748b;"><strong>Color</strong><br>Right-click items to change</div>
                     </div>
                 </div>
 
-                <div class="tool-section" style="background: #f0f9ff; padding: 10px; border-radius: 8px; border: 1px solid #bae6fd;">
-                    <h4 style="color: #0369a1; border:none; margin-bottom:5px;"><i class="fa-regular fa-circle-dot"></i> Fixed Circle</h4>
+                <div class="tool-section" style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <h4 style="color: #0f172a; border:none; margin-bottom:5px;"><i class="fa-regular fa-circle-dot"></i> Fixed Circle</h4>
                     <div class="control-row">
                         <input type="number" id="radiusInput" value="5" min="0.1" step="0.1">
                         <span style="font-size: 13px; font-weight: 600;">km</span>
@@ -226,7 +247,10 @@
                         <button class="btn" onclick="document.getElementById('fileInput').click()">Load JSON</button>
                         <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(this)">
                     </div>
-                    <button class="btn primary" onclick="exportImage()" style="width:100%"><i class="fa-solid fa-image"></i> Download Image</button>
+
+                    <!-- Download Button Removed per request -->
+                    <!-- <button class="btn primary" onclick="exportImage()" style="width:100%"><i class="fa-solid fa-image"></i> Download Image</button> -->
+
                     <button class="btn" onclick="clearMap()" style="width:100%; margin-top:10px; color: var(--danger); border-color: #fee2e2;">Clear All</button>
                 </div>
             </div>
@@ -235,8 +259,7 @@
         <div class="map-wrapper">
             <div id="map"></div>
             <div id="draw-helper">Snapping Active. Click last point again to finish.</div>
-            
-            <!-- Context Menu -->
+
             <div id="context-menu">
                 <h5 id="ctx-title">Edit Element</h5>
                 <div class="ctx-group" id="ctx-text-group" style="display:none;">
@@ -257,7 +280,6 @@
                 </div>
             </div>
 
-            <!-- Share Modal -->
             <div id="share-modal">
                 <div class="modal-content">
                     <h3 style="margin-top:0">Share Map</h3>
@@ -285,19 +307,19 @@
         let snapTarget = null;
         const layers = {};
 
-        // --- 1. Init Map ---
         function initMap() {
             map = L.map('map', { zoomControl: false }).setView([12.9716, 77.5946], 12);
             L.control.zoom({ position: 'topright' }).addTo(map);
             L.control.scale({ metric: true, imperial: true, position: 'bottomright' }).addTo(map);
 
-            // Layers
             layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', crossOrigin: true });
-            
-            // Hybrid
-            const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', crossOrigin: true });
-            const roads = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', { attribution: '© Esri', crossOrigin: true });
-            layers.google = L.layerGroup([sat, roads]);
+
+            layers.google = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0','mt1','mt2','mt3'],
+                attribution: '© Google',
+                crossOrigin: 'anonymous'
+            });
 
             layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', crossOrigin: true });
 
@@ -305,66 +327,47 @@
 
             drawnItems = new L.FeatureGroup();
             map.addLayer(drawnItems);
-            
+
             helperLayer = new L.LayerGroup();
             map.addLayer(helperLayer);
 
-            // Edit Handler - Removed 'dashArray' for solid selection lines
             editHandler = new L.EditToolbar.Edit(map, {
                 featureGroup: drawnItems,
-                selectedPathOptions: { maintainColor: true, opacity: 0.8, weight: 4 } // Solid lines
+                selectedPathOptions: { maintainColor: true, opacity: 0.8, weight: 4 }
             });
 
             map.on('click', closeContextMenu);
             map.on('movestart', closeContextMenu);
             map.on('mousemove', handleSnapMove);
 
-            // Check for Share URL Params
-            checkForShareData();
+            setTimeout(checkForShareData, 500);
         }
-        
-        // Call Init
         initMap();
 
-        // --- 2. Shareable URL Logic ---
+        // --- Shareable URL ---
         function generateShareLink() {
             const features = [];
             drawnItems.eachLayer(layer => {
+                let type = 'unknown';
+                let data = {};
                 if (layer instanceof L.Circle) {
-                    features.push({
-                        type: 'circle',
-                        lat: layer.getLatLng().lat,
-                        lng: layer.getLatLng().lng,
-                        radius: layer.getRadius(),
-                        color: layer.options.color
-                    });
+                    type = 'circle';
+                    data = { lat: layer.getLatLng().lat, lng: layer.getLatLng().lng, radius: layer.getRadius(), color: layer.options.color };
                 } else if (layer instanceof L.Marker && layer.feature && layer.feature.properties.type === 'text') {
-                    features.push({
-                        type: 'text',
-                        lat: layer.getLatLng().lat,
-                        lng: layer.getLatLng().lng,
-                        content: layer.feature.properties.content,
-                        color: layer.feature.properties.color
-                    });
+                    type = 'text';
+                    data = { lat: layer.getLatLng().lat, lng: layer.getLatLng().lng, content: layer.feature.properties.content, color: layer.feature.properties.color };
                 } else if (layer.toGeoJSON) {
-                    // Lines / Polygons
+                    type = 'geojson';
                     const f = layer.toGeoJSON();
                     f.properties.color = layer.options.color;
-                    features.push(f);
+                    data = f;
                 }
+                features.push({ type, data });
             });
-
-            const state = {
-                c: [map.getCenter().lat, map.getCenter().lng],
-                z: map.getZoom(),
-                d: features
-            };
-
-            // Encode
+            const state = { c: [map.getCenter().lat, map.getCenter().lng], z: map.getZoom(), d: features };
             const json = JSON.stringify(state);
-            const encoded = btoa(unescape(encodeURIComponent(json))); // Base64 safety
+            const encoded = btoa(unescape(encodeURIComponent(json)));
             const url = window.location.origin + window.location.pathname + '?map=' + encoded;
-
             document.getElementById('share-url-box').innerText = url;
             document.getElementById('share-modal').style.display = 'flex';
         }
@@ -381,91 +384,87 @@
                 try {
                     const json = decodeURIComponent(escape(atob(mapData)));
                     const state = JSON.parse(json);
-                    
-                    // Restore View
-                    map.setView(state.c, state.z);
-                    
-                    // Restore Items
-                    state.d.forEach(item => {
-                        restoreItem(item);
-                    });
+                    if(state.c && state.z) map.setView(state.c, state.z);
+                    if(state.d && Array.isArray(state.d)) state.d.forEach(item => restoreItem(item));
                     showToast('Map restored from link');
-                } catch (e) {
-                    console.error(e);
-                    showToast('Invalid Share Link', true);
-                }
+                } catch (e) { console.error("Share load error:", e); showToast('Invalid Share Link', true); }
             }
         }
 
         function restoreItem(item) {
-            let layer;
+            if (!item.type || !item.data) return;
+            const d = item.data;
+
+            // FIX: Ensure color is extracted correctly from either top-level (custom items) or properties (GeoJSON)
+            let color = d.color;
+            if (!color && d.properties && d.properties.color) {
+                color = d.properties.color;
+            }
+            color = color || '#000000';
+
             if (item.type === 'circle') {
-                const latlng = [item.lat, item.lng];
-                layer = createCircleLayer(latlng, item.radius, item.color);
+                createCircleLayer([d.lat, d.lng], d.radius, color);
             } else if (item.type === 'text') {
-                const latlng = [item.lat, item.lng];
-                layer = createTextLayer(latlng, item.content, item.color);
-            } else if (item.type === 'Feature') {
-                // Line / Polygon
-                L.geoJSON(item, {
-                    style: { color: item.properties.color, weight: 4, opacity: 1 }, // Solid lines
-                    onEachFeature: (f, l) => {
-                        l.options.color = item.properties.color; // Persist for edit
-                        layer = l;
-                        attachContextMenu(l);
-                        drawnItems.addLayer(l);
-                    }
+                createTextLayer([d.lat, d.lng], d.content, color);
+            } else if (item.type === 'geojson') {
+                L.geoJSON(d, {
+                    style: { color: color, weight: 4, opacity: 1 },
+                    onEachFeature: (f, l) => { l.options.color = color; attachContextMenu(l); drawnItems.addLayer(l); }
                 });
             }
         }
 
-        // --- 3. Helper Generators (Shared by Draw/Load) ---
+        // --- Helper Generators ---
+        function getDestinationPoint(latlng, heading, distance) {
+            const R = 6378137; const rad = Math.PI / 180;
+            const lat1 = latlng.lat * rad; const lon1 = latlng.lng * rad;
+            const angDist = distance / R; const trueCourse = heading * rad;
+            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angDist) + Math.cos(lat1) * Math.sin(angDist) * Math.cos(trueCourse));
+            const lon2 = lon1 + Math.atan2(Math.sin(trueCourse) * Math.sin(angDist) * Math.cos(lat1), Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2));
+            return L.latLng(lat2 / rad, lon2 / rad);
+        }
+
         function createCircleLayer(latlng, radius, color) {
             const circle = L.circle(latlng, { color: color, fillColor: color, fillOpacity: 0.2, radius: radius });
             const dot = L.circleMarker(latlng, { radius: 3, color: '#fff', weight: 1, fillColor: color, fillOpacity: 1, interactive: false });
-            const rim = getDestinationPoint(latlng, 90, radius);
-            // Dotted radius line
+            const rim = getDestinationPoint(L.latLng(latlng), 90, radius);
             const line = L.polyline([latlng, rim], { color: color, weight: 2, dashArray: '5, 5', interactive: false });
-            
-            // Permanent Label for Radius
             const km = (radius / 1000).toFixed(2) + ' km';
             line.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
-
             circle.centerDot = dot; circle.radiusLine = line;
             circle.feature = { type: 'Feature', properties: { type: 'circle', radius: radius, color: color } };
-            
             attachContextMenu(circle);
-            drawnItems.addLayer(circle);
-            helperLayer.addLayer(dot); helperLayer.addLayer(line);
+            drawnItems.addLayer(circle); helperLayer.addLayer(dot); helperLayer.addLayer(line);
             return circle;
         }
 
         function createTextLayer(latlng, text, color) {
-            const icon = L.divIcon({
-                className: 'custom-div-icon',
-                html: `<div class="custom-label" style="color:${color}; border-color:${color}">${text}</div>`,
-                iconSize: [null, null], iconAnchor: [20, 10]
-            });
+            const icon = L.divIcon({ className: 'custom-div-icon', html: `<div class="custom-label" style="color:${color}; border-color:${color}">${text}</div>`, iconSize: [null, null], iconAnchor: [20, 10] });
             const marker = L.marker(latlng, { icon: icon, draggable: isEditMode });
             marker.feature = { type: 'Feature', properties: { type: 'text', content: text, color: color } };
-            attachContextMenu(marker);
-            drawnItems.addLayer(marker);
-            return marker;
+            attachContextMenu(marker); drawnItems.addLayer(marker); return marker;
         }
 
-        // --- 4. Drawing & Snapping ---
+        function updateCircleHelpers(circle) {
+            if (!circle.centerDot || !circle.radiusLine) return;
+            const center = circle.getLatLng(); const radius = circle.getRadius();
+            circle.centerDot.setLatLng(center);
+            const rim = getDestinationPoint(center, 90, radius);
+            circle.radiusLine.setLatLngs([center, rim]);
+            const km = (radius / 1000).toFixed(2) + ' km';
+            if(circle.radiusLine.getTooltip()) circle.radiusLine.setTooltipContent(km);
+            else circle.radiusLine.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
+        }
+
+        // --- Tools ---
         function activateTool(toolName) {
             resetTools();
             activeTool = toolName;
             const color = document.getElementById('colorPicker').value;
-
             if (toolName === 'polyline' || toolName === 'polygon') {
                 document.getElementById('draw-helper').style.display = 'block';
                 const handler = (toolName === 'polyline') ? L.Draw.Polyline : L.Draw.Polygon;
-                nativeDrawHandler = new handler(map, { 
-                    shapeOptions: { color: color, weight: 4, opacity: 1 }, // Solid Lines
-                    allowIntersection: false
-                });
+                nativeDrawHandler = new handler(map, { shapeOptions: { color: color, weight: 4, opacity: 1 }, allowIntersection: false });
                 nativeDrawHandler.enable();
             } else if (toolName === 'fixedCircle') {
                 document.getElementById('btnFixedCircle').classList.add('active');
@@ -480,12 +479,10 @@
 
         function handleSnapMove(e) {
             if (!activeTool || (activeTool !== 'polyline' && activeTool !== 'polygon')) return;
-            let minDist = Infinity;
-            let nearest = null;
+            let minDist = Infinity; let nearest = null;
             drawnItems.eachLayer(layer => {
                 if (layer instanceof L.Polygon || layer instanceof L.Polyline) {
-                    const latlngs = layer.getLatLngs();
-                    const flat = Array.isArray(latlngs[0]) ? latlngs.flat(2) : latlngs;
+                    const latlngs = layer.getLatLngs(); const flat = Array.isArray(latlngs[0]) ? latlngs.flat(2) : latlngs;
                     flat.forEach(pt => {
                         const pxDist = map.latLngToContainerPoint(e.latlng).distanceTo(map.latLngToContainerPoint(pt));
                         if (pxDist < 20 && pxDist < minDist) { minDist = pxDist; nearest = pt; }
@@ -496,10 +493,7 @@
                 if (!snapMarker) snapMarker = L.marker(nearest, { icon: L.divIcon({ className: 'snap-marker', iconSize: [16, 16], iconAnchor: [8, 8] }), interactive: false }).addTo(map);
                 else { snapMarker.setLatLng(nearest); snapMarker.setOpacity(1); }
                 snapTarget = nearest;
-            } else {
-                if (snapMarker) snapMarker.setOpacity(0);
-                snapTarget = null;
-            }
+            } else { if (snapMarker) snapMarker.setOpacity(0); snapTarget = null; }
         }
 
         function resetTools() {
@@ -526,47 +520,15 @@
         });
 
         map.on(L.Draw.Event.CREATED, function (e) {
-            const l = e.layer;
-            const c = document.getElementById('colorPicker').value;
+            const l = e.layer; const c = document.getElementById('colorPicker').value;
             if(l.setStyle) l.setStyle({ color:c, fillColor:c, weight: 4 });
             l.feature = { type:'Feature', properties:{ color:c } };
-            attachContextMenu(l);
-            drawnItems.addLayer(l);
+            attachContextMenu(l); drawnItems.addLayer(l);
             if(isEditMode) { editHandler.removeHooks(); editHandler.addHooks(); }
             resetTools();
         });
 
-        // --- 5. Helpers Logic (Move/Update) ---
-        function getDestinationPoint(latlng, heading, distance) {
-            const R = 6378137; const rad = Math.PI / 180;
-            const lat1 = latlng.lat * rad; const lon1 = latlng.lng * rad;
-            const angDist = distance / R; const trueCourse = heading * rad;
-            const lat2 = Math.asin(Math.sin(lat1) * Math.cos(angDist) + Math.cos(lat1) * Math.sin(angDist) * Math.cos(trueCourse));
-            const lon2 = lon1 + Math.atan2(Math.sin(trueCourse) * Math.sin(angDist) * Math.cos(lat1), Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2));
-            return L.latLng(lat2 / rad, lon2 / rad);
-        }
-
-        function updateCircleHelpers(circle) {
-            if (!circle.centerDot || !circle.radiusLine) return;
-            const center = circle.getLatLng();
-            const radius = circle.getRadius();
-            
-            // 1. Move Center Dot
-            circle.centerDot.setLatLng(center);
-            
-            // 2. Update Radius Line & Tooltip
-            const rim = getDestinationPoint(center, 90, radius);
-            circle.radiusLine.setLatLngs([center, rim]);
-            
-            const km = (radius / 1000).toFixed(2) + ' km';
-            if(circle.radiusLine.getTooltip()) {
-                circle.radiusLine.setTooltipContent(km);
-            } else {
-                circle.radiusLine.bindTooltip(km, { permanent: true, direction: 'center', className: 'radius-label' });
-            }
-        }
-
-        // --- 6. Edit & Context Menu ---
+        // --- Edit Mode ---
         function toggleEditMode() {
             isEditMode = !isEditMode;
             const btn = document.getElementById('btnEditMode');
@@ -588,9 +550,9 @@
         function attachContextMenu(layer) {
             layer.on('contextmenu', e => { L.DomEvent.stopPropagation(e); openContextMenu(e, layer); });
             if (layer instanceof L.Circle) {
-                layer.on('move', () => updateCircleHelpers(layer)); 
-                layer.on('drag', () => updateCircleHelpers(layer)); 
-                layer.on('edit', () => updateCircleHelpers(layer)); 
+                layer.on('move', () => updateCircleHelpers(layer));
+                layer.on('drag', () => updateCircleHelpers(layer));
+                layer.on('edit', () => updateCircleHelpers(layer));
             }
         }
 
@@ -599,20 +561,18 @@
             const menu = document.getElementById('context-menu');
             document.getElementById('ctx-text-group').style.display = 'none';
             document.getElementById('ctx-radius-group').style.display = 'none';
-            
+
             if (layer instanceof L.Circle) {
                 document.getElementById('ctx-radius-group').style.display = 'block';
                 document.getElementById('ctx-radius-input').value = (layer.getRadius()/1000).toFixed(2);
-                document.getElementById('ctx-color-input').value = layer.options.color || '#2563eb';
+                document.getElementById('ctx-color-input').value = layer.options.color || '#000000';
             } else if (layer instanceof L.Marker) {
                 document.getElementById('ctx-text-group').style.display = 'block';
                 const div = document.createElement('div'); div.innerHTML = layer.options.icon.options.html;
                 document.getElementById('ctx-text-input').value = div.innerText;
                 const match = div.innerHTML.match(/color:(#[0-9a-fA-F]+)/);
                 if(match) document.getElementById('ctx-color-input').value = match[1];
-            } else {
-                document.getElementById('ctx-color-input').value = layer.options.color || '#2563eb';
-            }
+            } else { document.getElementById('ctx-color-input').value = layer.options.color || '#000000'; }
             const pt = map.mouseEventToContainerPoint(e.originalEvent);
             menu.style.left = pt.x + 'px'; menu.style.top = pt.y + 'px';
             menu.style.display = 'block';
@@ -633,11 +593,7 @@
                 if(ctxTargetLayer.feature) { ctxTargetLayer.feature.properties.radius = m; ctxTargetLayer.feature.properties.color = color; }
             } else if (ctxTargetLayer instanceof L.Marker) {
                 const txt = document.getElementById('ctx-text-input').value;
-                ctxTargetLayer.setIcon(L.divIcon({
-                    className:'custom-div-icon', 
-                    html:`<div class="custom-label" style="color:${color}; border-color:${color}">${txt}</div>`,
-                    iconSize:[null,null], iconAnchor:[20,10]
-                }));
+                ctxTargetLayer.setIcon(L.divIcon({ className:'custom-div-icon', html:`<div class="custom-label" style="color:${color}; border-color:${color}">${txt}</div>`, iconSize:[null,null], iconAnchor:[20,10] }));
                 if(ctxTargetLayer.feature) ctxTargetLayer.feature.properties = { type:'text', content:txt, color:color };
             } else {
                 ctxTargetLayer.setStyle({ color: color, fillColor: color });
@@ -655,36 +611,36 @@
             }
         }
 
-        // --- 7. Export & Utils ---
-        function exportImage() {
-            document.getElementById('loader').style.display='flex';
-            const ctrl = document.querySelectorAll('.leaflet-control-container, .leaflet-draw-tooltip');
-            ctrl.forEach(c => c.style.display='none');
-            
-            // Force manual sync of transforms for capture (Leaflet + html2canvas fix)
-            const mapEl = document.getElementById('map');
-            
-            setTimeout(() => {
-                html2canvas(mapEl, {
-                    useCORS: true, allowTaint: false,
-                    width: mapEl.offsetWidth, height: mapEl.offsetHeight,
-                    scrollX: 0, scrollY: 0
-                }).then(c => {
-                    const a = document.createElement('a');
-                    a.href = c.toDataURL(); a.download='map-export.png'; a.click();
-                    ctrl.forEach(c => c.style.display='block');
-                    document.getElementById('loader').style.display='none';
-                });
-            }, 800);
+        // --- IO ---
+        async function handleSearchInput(q) {
+            clearTimeout(searchTimeout);
+            const el = document.getElementById('searchResults');
+            if(!q || q.length<3) { el.style.display='none'; return; }
+            searchTimeout = setTimeout(async () => {
+                const res = await new window.GeoSearch.OpenStreetMapProvider().search({ query:q });
+                el.innerHTML = '';
+                if(res.length) {
+                    res.forEach(r => {
+                        const d = document.createElement('div'); d.className='search-item'; d.innerText=r.label;
+                        d.onclick = () => { map.setView([r.y, r.x], 13); el.style.display='none'; };
+                        el.appendChild(d);
+                    });
+                    el.style.display='block';
+                } else el.style.display='none';
+            }, 400);
         }
 
         function changeLayer(t, btn) {
-            map.eachLayer(l => { if(l!==drawnItems && l!==helperLayer && l!==map.zoomControl && !l._url?.includes('tile.openstreetmap')) {} }); 
+            map.eachLayer(l => { if(l!==drawnItems && l!==helperLayer && l!==map.zoomControl && !l._url?.includes('tile.openstreetmap')) {} });
             map.removeLayer(layers.street); map.removeLayer(layers.google); map.removeLayer(layers.dark);
             layers[t].addTo(map);
             document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         }
+
+        // --- EXPORT FUNCTION DEFERRED ---
+        /* function exportImage() { ... }
+        */
 
         function downloadJSON() {
             const gj = { type:"FeatureCollection", features:[] };
@@ -707,16 +663,7 @@
             r.onload = e => {
                 const d = JSON.parse(e.target.result); drawnItems.clearLayers(); helperLayer.clearLayers();
                 d.features.forEach(item => {
-                    if(item.properties.type === 'circle') {
-                        createCircleLayer([item.geometry.coordinates[1], item.geometry.coordinates[0]], item.properties.radius, item.properties.color);
-                    } else if(item.properties.type === 'text') {
-                        createTextLayer([item.geometry.coordinates[1], item.geometry.coordinates[0]], item.properties.content, item.properties.color);
-                    } else {
-                        L.geoJSON(item, {
-                            style: { color: item.properties.color, weight:4 },
-                            onEachFeature: (f, l) => { attachContextMenu(l); drawnItems.addLayer(l); }
-                        });
-                    }
+                    restoreItem({ type: item.properties.type || 'geojson', data: item });
                 });
                 showToast('Loaded');
             };
