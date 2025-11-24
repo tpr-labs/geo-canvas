@@ -130,7 +130,7 @@
         .map-wrapper { flex: 1; position: relative; }
         #map { height: 100%; width: 100%; z-index: 1; }
 
-        /* Capture Mode */
+        /* Capture Mode (Critical for Export) */
         body.capture-mode .sidebar { display: none !important; }
         body.capture-mode .map-wrapper { width: 100vw !important; height: 100vh !important; position: fixed; top:0; left:0; z-index: 9999; }
         body.capture-mode #map { width: 100% !important; height: 100% !important; }
@@ -152,7 +152,6 @@
         .measure-label-area {
             color: #facc15; font-size: 13px; text-shadow: -1px -1px 2px black, 1px 1px 2px black;
         }
-        /* Radius label specifically for circles */
         .radius-label-marker {
             background: transparent; border: none; box-shadow: none;
             color: #0f172a; font-weight: 800; font-size: 12px;
@@ -191,13 +190,11 @@
             margin: 10px 0; max-height: 80px; overflow-y: auto;
         }
 
-        /* Snap Marker */
         .snap-marker {
             background: transparent; border: 2px solid #facc15; border-radius: 50%;
             box-shadow: 0 0 0 2px rgba(0,0,0,0.3); pointer-events: none;
         }
 
-        /* Loader */
         #toast-container { position: fixed; bottom: 30px; right: 30px; z-index: 2000; }
         .toast { background: #1e293b; color: white; padding: 12px 20px; border-radius: 8px; margin-top: 10px; font-size: 13px; animation: slideUp 0.3s ease; display: flex; align-items: center; gap: 10px; }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -293,6 +290,9 @@
                         <button class="btn" onclick="document.getElementById('fileInput').click()">Load JSON</button>
                         <input type="file" id="fileInput" accept=".json" style="display:none" onchange="loadJSON(this)">
                     </div>
+                    <button class="btn" onclick="exportImage()" style="width:100%; margin-top:10px; background:#1e293b; color:white; border-color:#1e293b;">
+                        <i class="fa-solid fa-image"></i> Download Image
+                    </button>
                     <button class="btn" onclick="clearMap()" style="width:100%; margin-top:10px; color: var(--danger); border-color: #fee2e2;">Clear All</button>
                 </div>
             </div>
@@ -359,8 +359,14 @@
             L.control.zoom({ position: 'topright' }).addTo(map);
             L.control.scale({ metric: true, imperial: true, position: 'bottomright' }).addTo(map);
 
+            // Define Layers
             layers.street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OSM', crossOrigin: true });
-            layers.google = L.tileLayer('http://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'], attribution: '© Google', crossOrigin: 'anonymous' });
+
+            // Use HTTPS for Google to prevent block, crossOrigin anonymous for canvas support (best effort)
+            layers.google = L.tileLayer('https://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}', {
+                maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'], attribution: '© Google', crossOrigin: 'anonymous'
+            });
+
             layers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB', crossOrigin: true });
 
             layers.street.addTo(map);
@@ -592,7 +598,6 @@
             const km = (radius / 1000).toFixed(2) + ' km';
 
             // Use a label marker instead of binding a tooltip to the line
-            // This ensures we can update the text + position reliably in Leaflet 1.x
             const midPoint = L.latLng(
                 (latlng.lat + rim.lat) / 2,
                 (latlng.lng + rim.lng) / 2
@@ -649,7 +654,6 @@
             circle.radiusLabel.setLatLng(midPoint);
             const km = (radius / 1000).toFixed(2) + ' km';
 
-            // Efficiently update label text
             const icon = circle.radiusLabel.options.icon;
             icon.options.html = km;
             circle.radiusLabel.setIcon(icon);
@@ -671,6 +675,7 @@
                 });
                 nativeDrawHandler.enable();
             } else if (toolName === 'fixedCircle') {
+                // Directly draw 5km circle
                 document.getElementById('btnFixedCircle').classList.add('active');
                 map.getContainer().style.cursor = 'copy';
                 showToast('Click center point on map');
@@ -712,13 +717,16 @@
 
         map.on('click', function(e) {
             const color = document.getElementById('colorPicker').value;
+
             if (activeTool === 'fixedCircle') {
                 const km = 5;
                 createCircleLayer(e.latlng, km * 1000, color);
                 saveState();
+
                 if(!isEditMode) toggleEditMode();
                 resetTools();
-            } else if (activeTool === 'text') {
+            }
+            else if (activeTool === 'text') {
                 setTimeout(() => {
                     const text = prompt("Enter Text:");
                     if (text) { createTextLayer(e.latlng, text, color); resetTools(); saveState(); }
@@ -735,7 +743,7 @@
                 btn.classList.add('active');
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Editing Active</span>';
                 editHandler.enable();
-                enableLiveEditHooks(); // Bind live updates for Polys
+                enableLiveEditHooks();
                 drawnItems.eachLayer(l => { if(l instanceof L.Marker && l.dragging) l.dragging.enable(); });
                 showToast("You can now drag & resize items");
             } else {
@@ -874,6 +882,68 @@
                 });
             }
         }
+
+        // --- IO ---
+        async function handleSearchInput(q) {
+            clearTimeout(searchTimeout);
+            const el = document.getElementById('searchResults');
+            if(!q || q.length<3) { el.style.display='none'; return; }
+            searchTimeout = setTimeout(async () => {
+                const res = await new window.GeoSearch.OpenStreetMapProvider().search({ query:q });
+                el.innerHTML = '';
+                if(res.length) {
+                    res.forEach(r => {
+                        const d = document.createElement('div'); d.className='search-item'; d.innerText=r.label;
+                        d.onclick = () => { map.setView([r.y, r.x], 13); el.style.display='none'; };
+                        el.appendChild(d);
+                    });
+                    el.style.display='block';
+                } else el.style.display='none';
+            }, 400);
+        }
+
+        function changeLayer(type, btn) {
+            // Robustly clear known layers to avoid stack-up
+            [layers.street, layers.google, layers.dark].forEach(l => {
+                if (map.hasLayer(l)) map.removeLayer(l);
+            });
+            // Add the selected one
+            if(layers[type]) layers[type].addTo(map);
+
+            // Update Buttons
+            document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+        }
+
+        function downloadJSON() {
+            const gj = { type:"FeatureCollection", features:[] };
+            drawnItems.eachLayer(l => {
+                if(l.toGeoJSON) {
+                    const f = l.toGeoJSON();
+                    if(l instanceof L.Circle) f.geometry = { type:"Point", coordinates:[l.getLatLng().lng, l.getLatLng().lat] };
+                    f.properties = l.feature ? l.feature.properties : {};
+                    gj.features.push(f);
+                }
+            });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(gj)], {type:'application/json'}));
+            a.download = `map-${Date.now()}.json`; a.click();
+        }
+
+        function loadJSON(input) {
+            const f = input.files[0]; if(!f) return;
+            const r = new FileReader();
+            r.onload = e => {
+                const d = JSON.parse(e.target.result);
+                applyMapState(d.features.map(item => ({ type: item.properties.type || 'geojson', data: item })));
+                saveState();
+                showToast('Loaded');
+            };
+            r.readAsText(f); input.value='';
+        }
+
+        function clearMap() { if(confirm("Clear?")) { drawnItems.clearLayers(); helperLayer.clearLayers(); saveState(); } }
+        function showToast(m,e) { const t = document.createElement('div'); t.className='toast'; t.innerText=m; document.getElementById('toast-container').appendChild(t); setTimeout(()=>t.remove(),3000); }
 
         // --- Fixed Export (Snapshot Mode) ---
         function exportImage() {
